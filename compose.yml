@@ -18,8 +18,11 @@ x-redmine-environment: &redmine-environment
   REDMINE_DB_USERNAME: ${POSTGRES_USER:-redmine}
   REDMINE_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
   REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE:?Set REDMINE_SECRET_KEY_BASE in .env}
+  SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE:?Set REDMINE_SECRET_KEY_BASE in .env}
   COSMOSYS_SESSION_COOKIE_KEY: ${COSMOSYS_SESSION_COOKIE_KEY:-_cosmosys_session}
   RSPREADSHEET_PATH: /opt/rspreadsheet
+  RAILS_ENV: production
+  REDMINE_LANG: ${REDMINE_LANG:-en}
 
 services:
   db:
@@ -46,7 +49,7 @@ services:
     environment: *redmine-environment
     volumes:
       - files:/usr/src/redmine/files
-    command: ["bundle", "exec", "rake", "db:migrate", "redmine:plugins:migrate"]
+    command: ["sh", "-c", "bundle exec rake db:migrate && bundle exec rake redmine:load_default_data && bundle exec rake redmine:plugins:migrate"]
 
   redmine:
     <<: *redmine-image

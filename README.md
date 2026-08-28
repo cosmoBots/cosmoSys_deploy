@@ -26,6 +26,17 @@ Validate both effective configurations:
 ./scripts/check-config.sh
 ```
 
+Run an isolated end-to-end validation of both variants (temporary containers
+and volumes are removed afterwards):
+
+```sh
+./scripts/validate-deployment.sh
+```
+
+Pass `base` or `requirements` to validate only one variant. Set
+`KEEP_VALIDATION_STACK=1` to retain a failed or successful validation stack
+for inspection; its generated Compose project name is printed before startup.
+
 ## Base variant
 
 ```sh
@@ -50,6 +61,14 @@ on an installation whose data must survive.
 The default Redmine and PostgreSQL images, plugin sources and rspreadsheet
 source are pinned to immutable revisions. Updating one is a deliberate change
 that must be validated for both deployment variants.
+
+Database configuration is supplied as an ERB file that consumes only the
+standard container environment variables. This also lets the one-shot
+migration service boot Rails before the web service is started.
+
+On a new database that service migrates Redmine, loads its initial data using
+`REDMINE_LANG` (`en` by default), and then migrates the plugins. The operations
+are safe to rerun on later starts.
 
 The first login follows Redmine's normal initial-administrator procedure. The
 managed `csys_help` and `csys_admin_help` content packages are not part of this

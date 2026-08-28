@@ -6,6 +6,8 @@ FROM ${REDMINE_IMAGE} AS cosmosys_base
 ARG COSMOSYS_REVISION=a678d44ae6bb71df9d4ac3e8274fcfd90fdbd005
 ARG RSPREADSHEET_REVISION=3cf3031fc122306d09af7e503b66338c1b8ceb09
 
+COPY config/database.yml config/database.yml
+
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
       build-essential git graphviz libxml2-dev librsvg2-bin libreoffice-writer pkg-config \
