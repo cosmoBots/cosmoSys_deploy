@@ -7,6 +7,7 @@ export COSMOSYS_VARIANT=base
 export COSMOSYS_COMPOSE_PROJECT="csys_backup_validation_$$"
 export POSTGRES_PASSWORD="validation-database-password-$$"
 export REDMINE_SECRET_KEY_BASE="validation-secret-key-base-$$"
+export COSMOSYS_INITIAL_ADMIN_PASSWORD="validation-admin-password-$$"
 export COSMOSYS_HTTP_PORT=0
 
 validation_directory=$(mktemp -d)

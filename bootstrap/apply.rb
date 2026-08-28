@@ -6,6 +6,28 @@ package = YAML.safe_load_file(package_path, permitted_classes: [], aliases: fals
 metadata = package.fetch('package')
 registry_setting = 'cosmosys_managed_content_registry'
 
+password = ENV['COSMOSYS_INITIAL_ADMIN_PASSWORD'].to_s
+password_file = ENV['COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE'].to_s
+abort 'Set only one of COSMOSYS_INITIAL_ADMIN_PASSWORD or COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE' \
+  if !password.empty? && !password_file.empty?
+password = File.read(password_file).strip unless password_file.empty?
+abort 'An initial administrator password is required' if password.empty?
+
+admin = User.active.find_by_login('admin')
+abort 'The initial Redmine administrator account does not exist' unless admin
+
+if admin.check_password?('admin') && admin.last_login_on.nil?
+  admin.password = password
+  admin.password_confirmation = password
+  admin.must_change_passwd = false
+  admin.save!
+  puts 'Configured the initial administrator password'
+elsif admin.check_password?(password)
+  puts 'Initial administrator password already configured'
+else
+  puts 'Administrator account already managed; keeping its current password'
+end
+
 Setting.define_setting(registry_setting, 'default' => {}, 'serialized' => true) \
   unless Setting.available_settings.key?(registry_setting)
 registry = Setting[registry_setting]

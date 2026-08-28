@@ -20,6 +20,14 @@ for example, with `openssl rand -hex 64`. The repository currently uses SSH
 forwarding during image construction because the plugin repositories are
 private; load an authorized GitHub key into your SSH agent first.
 
+Set `COSMOSYS_INITIAL_ADMIN_PASSWORD` before the first start. The bootstrap
+replaces Redmine's unsafe `admin`/`admin` credentials before the web service is
+exposed and clears the forced password-change flag. It only acts while the
+account still has the untouched default password and no successful login; a
+later bootstrap never resets an administrator-managed password. For secret
+mounts, leave that variable empty and set
+`COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE` to the mounted file instead.
+
 Validate both effective configurations:
 
 ```sh

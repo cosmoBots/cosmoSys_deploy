@@ -26,6 +26,7 @@ validate_variant() {
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
   export REDMINE_SECRET_KEY_BASE="validation-secret-key-base-$$"
+  export COSMOSYS_INITIAL_ADMIN_PASSWORD="validation-admin-password-$$"
   export COSMOSYS_HTTP_PORT=0
 
   compose() {
@@ -54,6 +55,8 @@ validate_variant() {
     "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if expected == ['cosmosys'] && actual.include?('cosmosys_req')"
   compose exec -T redmine bundle exec rails runner \
     "public_help = Project.find_by(identifier: 'csys_help'); admin_help = Project.find_by(identifier: 'csys_admin_help'); abort('missing public help') unless public_help&.is_public?; abort('missing private admin help') unless admin_help && !admin_help.is_public?; abort('missing help pages') unless public_help.wiki.find_page('csInt_Overview', with_redirect: false) && public_help.wiki.find_page('Overview', with_redirect: false); abort('missing managed registry') unless Setting.where(name: 'cosmosys_managed_content_registry').exists?"
+  compose exec -T redmine bundle exec rails runner \
+    "admin = User.active.find_by_login('admin'); abort('initial admin password not configured') unless admin&.check_password?(ENV.fetch('COSMOSYS_INITIAL_ADMIN_PASSWORD')); abort('admin still forced to change password') if admin.must_change_passwd?"
 
   if [ "$selected_variant" = base ]; then
     compose exec -T redmine bundle exec rails runner \
