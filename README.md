@@ -37,6 +37,34 @@ Pass `base` or `requirements` to validate only one variant. Set
 `KEEP_VALIDATION_STACK=1` to retain a failed or successful validation stack
 for inspection; its generated Compose project name is printed before startup.
 
+## Backup and restore
+
+Back up the running database and Redmine file store into a timestamped,
+checksummed directory:
+
+```sh
+./scripts/backup.sh
+```
+
+For the Requirements composition, set `COSMOSYS_VARIANT=requirements` for both
+backup and restore. Restore is intentionally explicit and destructive:
+
+```sh
+RESTORE_CONFIRMATION=ERASE_EXISTING_COSMOSYS_DATA \
+  ./scripts/restore.sh backups/20260828T120000Z
+```
+
+The restore verifies every hash before stopping Redmine. It replaces only the
+database and `files` volume belonging to the selected Compose deployment; the
+database container remains online. Keep `.env` and the backup outside source
+control and copy backups to storage outside the Docker host.
+
+The destructive path has its own disposable integration test:
+
+```sh
+./scripts/validate-backup-restore.sh
+```
+
 ## Base variant
 
 ```sh
