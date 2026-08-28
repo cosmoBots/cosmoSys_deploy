@@ -1,0 +1,73 @@
+name: cosmosys
+
+x-redmine-image: &redmine-image
+  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:a678d44}
+  build:
+    context: .
+    target: cosmosys_base
+    ssh:
+      - default
+    args:
+      REDMINE_IMAGE: ${REDMINE_IMAGE:-redmine:7.0.0@sha256:966156b9feff91511fb022b3fb5c1059c303e1c26f40baa670257c5fde0de2c7}
+      COSMOSYS_REVISION: ${COSMOSYS_REVISION:-a678d44ae6bb71df9d4ac3e8274fcfd90fdbd005}
+      RSPREADSHEET_REVISION: ${RSPREADSHEET_REVISION:-3cf3031fc122306d09af7e503b66338c1b8ceb09}
+
+x-redmine-environment: &redmine-environment
+  REDMINE_DB_POSTGRES: db
+  REDMINE_DB_DATABASE: ${POSTGRES_DB:-redmine}
+  REDMINE_DB_USERNAME: ${POSTGRES_USER:-redmine}
+  REDMINE_DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+  REDMINE_SECRET_KEY_BASE: ${REDMINE_SECRET_KEY_BASE:?Set REDMINE_SECRET_KEY_BASE in .env}
+  COSMOSYS_SESSION_COOKIE_KEY: ${COSMOSYS_SESSION_COOKIE_KEY:-_cosmosys_session}
+  RSPREADSHEET_PATH: /opt/rspreadsheet
+
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-redmine}
+      POSTGRES_USER: ${POSTGRES_USER:-redmine}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    <<: *redmine-image
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment: *redmine-environment
+    volumes:
+      - files:/usr/src/redmine/files
+    command: ["bundle", "exec", "rake", "db:migrate", "redmine:plugins:migrate"]
+
+  redmine:
+    <<: *redmine-image
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *redmine-environment
+    ports:
+      - "${COSMOSYS_BIND_ADDRESS:-127.0.0.1}:${COSMOSYS_HTTP_PORT:-3000}:3000"
+    volumes:
+      - files:/usr/src/redmine/files
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+volumes:
+  database:
+  files:

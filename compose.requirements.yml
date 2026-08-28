@@ -1,0 +1,13 @@
+x-requirements-image: &requirements-image
+  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:da016a4}
+  build:
+    target: cosmosys_requirements
+    args:
+      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-da016a4210cdedc2d671fa7390f50e3928a2a42b}
+
+services:
+  migrate:
+    <<: *requirements-image
+
+  redmine:
+    <<: *requirements-image
