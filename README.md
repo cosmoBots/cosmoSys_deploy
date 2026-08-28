@@ -99,8 +99,11 @@ On a new database that service migrates Redmine, loads its initial data using
 are safe to rerun on later starts.
 
 The first login follows Redmine's normal initial-administrator procedure. The
-managed `csys_help` and `csys_admin_help` content packages are not part of this
-initial artifact; `scripts/bootstrap-content.sh` is only their future hook.
+initial content package creates public `csys_help` and private
+`csys_admin_help` wiki projects. Software-managed `csInt_` pages are refreshed
+idempotently; ordinary facade pages are created once and then belong to the
+administrator. Run `scripts/bootstrap-content.sh` to reapply the current
+package explicitly.
 
 - Copyright and authorship: cosmoBots.eu
 - Contact: txinto@elporis.com

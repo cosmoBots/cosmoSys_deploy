@@ -1,0 +1,69 @@
+package:
+  key: csys_help
+  version: 1
+  locale: en
+  formatter: common_mark
+
+projects:
+  - key: public_help
+    identifier: csys_help
+    cscode: CSYSHLP
+    name: cosmoSys Help
+    public: true
+    start_page: Overview
+    pages:
+      - key: overview
+        internal_title: csInt_Overview
+        facade_title: Overview
+        body: |
+          # cosmoSys help
+
+          This page is managed by cosmoSys deployment package version 1.
+
+          It is the stable starting point for user-facing help. Later packages
+          will expand this content without overwriting the administrator-owned
+          `Overview` facade that includes it.
+      - key: item_references
+        internal_title: csInt_ItemReferences
+        facade_title: Item references
+        body: |
+          # Item references
+
+          cosmoSys items use a stable `csid` inside their complete project tree.
+          Relations and document references must be created through cosmoSys or
+          Redmine interfaces so project visibility and structural constraints
+          are preserved.
+  - key: administrator_help
+    identifier: csys_admin_help
+    cscode: CSYSADM
+    name: cosmoSys Administrator Help
+    public: false
+    start_page: Overview
+    pages:
+      - key: overview
+        internal_title: csInt_Admin_Overview
+        facade_title: Overview
+        body: |
+          # cosmoSys administrator help
+
+          This private project contains operational guidance supplied by the
+          deployment. Administrators may extend this facade while managed
+          `csInt_` pages continue to receive package updates.
+      - key: backups
+        internal_title: csInt_Admin_Backups
+        facade_title: Backups
+        body: |
+          # Backups
+
+          A minimum cosmoSys backup contains PostgreSQL, the Redmine `files`
+          volume, a revision manifest and SHA-256 checksums. Use the deployment
+          scripts and keep verified copies outside the Docker host.
+      - key: updates
+        internal_title: csInt_Admin_Updates
+        facade_title: Updates
+        body: |
+          # Updates
+
+          Update pinned image digests and source revisions deliberately. Before
+          applying an update to persistent data, validate both deployment
+          variants and take a verified backup.

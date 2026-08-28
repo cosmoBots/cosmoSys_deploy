@@ -52,6 +52,16 @@ validate_variant() {
 
   compose exec -T redmine bundle exec rails runner \
     "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if expected == ['cosmosys'] && actual.include?('cosmosys_req')"
+  compose exec -T redmine bundle exec rails runner \
+    "public_help = Project.find_by(identifier: 'csys_help'); admin_help = Project.find_by(identifier: 'csys_admin_help'); abort('missing public help') unless public_help&.is_public?; abort('missing private admin help') unless admin_help && !admin_help.is_public?; abort('missing help pages') unless public_help.wiki.find_page('csInt_Overview', with_redirect: false) && public_help.wiki.find_page('Overview', with_redirect: false); abort('missing managed registry') unless Setting.where(name: 'cosmosys_managed_content_registry').exists?"
+
+  if [ "$selected_variant" = base ]; then
+    compose exec -T redmine bundle exec rails runner \
+      "wiki = Project.find_by!(identifier: 'csys_help').wiki; facade = wiki.find_page('Overview', with_redirect: false); facade.content.update!(text: 'Administrator customization'); internal = wiki.find_page('csInt_Overview', with_redirect: false); internal.content.update!(text: 'Unsupported managed customization')"
+    compose run --rm bootstrap >/dev/null
+    compose exec -T redmine bundle exec rails runner \
+      "wiki = Project.find_by!(identifier: 'csys_help').wiki; abort('facade overwritten') unless wiki.find_page('Overview', with_redirect: false).content.text == 'Administrator customization'; abort('managed page not restored') unless wiki.find_page('csInt_Overview', with_redirect: false).content.text.include?('cosmoSys help')"
+  fi
   compose exec -T redmine bundle exec rake db:migrate:status >/dev/null
   compose exec -T redmine ruby -rnet/http -e \
     "response = Net::HTTP.get_response(URI('http://127.0.0.1:3000/')); abort(response.code) unless response.is_a?(Net::HTTPSuccess) || response.is_a?(Net::HTTPRedirection)"

@@ -51,6 +51,19 @@ services:
       - files:/usr/src/redmine/files
     command: ["sh", "-c", "bundle exec rake db:migrate && bundle exec rake redmine:load_default_data && bundle exec rake redmine:plugins:migrate"]
 
+  bootstrap:
+    <<: *redmine-image
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment: *redmine-environment
+    volumes:
+      - files:/usr/src/redmine/files
+    command: ["bundle", "exec", "rails", "runner", "/opt/cosmosys-deploy/bootstrap/apply.rb", "/opt/cosmosys-deploy/bootstrap/content/v1/en.yml"]
+
   redmine:
     <<: *redmine-image
     restart: unless-stopped
@@ -58,6 +71,8 @@ services:
       db:
         condition: service_healthy
       migrate:
+        condition: service_completed_successfully
+      bootstrap:
         condition: service_completed_successfully
     environment: *redmine-environment
     ports:

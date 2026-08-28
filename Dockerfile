@@ -32,6 +32,8 @@ RUN bundle install \
     && apt-get purge -y --auto-remove build-essential libxml2-dev pkg-config \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
+COPY bootstrap /opt/cosmosys-deploy/bootstrap
+
 FROM cosmosys_base AS cosmosys_requirements
 
 ARG COSMOSYS_REQ_REVISION=da016a4210cdedc2d671fa7390f50e3928a2a42b
