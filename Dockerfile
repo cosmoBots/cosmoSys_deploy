@@ -3,7 +3,7 @@
 ARG REDMINE_IMAGE=redmine:7.0.0@sha256:966156b9feff91511fb022b3fb5c1059c303e1c26f40baa670257c5fde0de2c7
 FROM ${REDMINE_IMAGE} AS cosmosys_base
 
-ARG COSMOSYS_REVISION=63ac743782584e82b32d150ed2fa9eb3a59ca3a8
+ARG COSMOSYS_REVISION=0f7582b45d59be4fd41dc7582a847ceca693cf11
 ARG RSPREADSHEET_REVISION=3cf3031fc122306d09af7e503b66338c1b8ceb09
 
 COPY config/database.yml config/database.yml
@@ -36,7 +36,7 @@ COPY bootstrap /opt/cosmosys-deploy/bootstrap
 
 FROM cosmosys_base AS cosmosys_requirements
 
-ARG COSMOSYS_REQ_REVISION=586a1d72f5c4471881ad8fc7a06f0b6f470464dc
+ARG COSMOSYS_REQ_REVISION=04a9f91a700ab3b88154b8137b776f6581af285e
 
 RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys_Req.git plugins/cosmosys_req \
     && git -C plugins/cosmosys_req checkout "${COSMOSYS_REQ_REVISION}" \

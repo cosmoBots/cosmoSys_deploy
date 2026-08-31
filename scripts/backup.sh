@@ -38,8 +38,8 @@ deployment_compose exec -T redmine \
   echo "variant=${COSMOSYS_VARIANT:-base}"
   echo "database=$database_name"
   echo "database_user=$database_user"
-  echo "cosmosys_revision=${COSMOSYS_REVISION:-63ac743782584e82b32d150ed2fa9eb3a59ca3a8}"
-  echo "cosmosys_req_revision=${COSMOSYS_REQ_REVISION:-586a1d72f5c4471881ad8fc7a06f0b6f470464dc}"
+  echo "cosmosys_revision=${COSMOSYS_REVISION:-0f7582b45d59be4fd41dc7582a847ceca693cf11}"
+  echo "cosmosys_req_revision=${COSMOSYS_REQ_REVISION:-04a9f91a700ab3b88154b8137b776f6581af285e}"
   echo "rspreadsheet_revision=${RSPREADSHEET_REVISION:-3cf3031fc122306d09af7e503b66338c1b8ceb09}"
 } >"$temporary_directory/manifest.env"
 

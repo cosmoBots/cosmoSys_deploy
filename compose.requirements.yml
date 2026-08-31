@@ -1,9 +1,9 @@
 x-requirements-image: &requirements-image
-  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:586a1d7}
+  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:04a9f91}
   build:
     target: cosmosys_requirements
     args:
-      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-586a1d72f5c4471881ad8fc7a06f0b6f470464dc}
+      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-04a9f91a700ab3b88154b8137b776f6581af285e}
 
 services:
   migrate:
