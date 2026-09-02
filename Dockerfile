@@ -26,7 +26,7 @@ RUN git clone --filter=blob:none https://github.com/cosmoBots/rspreadsheet.git /
     && test "$(git -C /opt/rspreadsheet rev-parse HEAD)" = "${RSPREADSHEET_REVISION}" \
     && rm -rf /opt/rspreadsheet/.git
 
-ARG COSMOSYS_REVISION=7318bacf1d97354c28414c636fe6dfbf699e3965
+ARG COSMOSYS_REVISION=1d940430da077fb408dcbc14e94337ce9b9da288
 
 RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys.git plugins/cosmosys \
     && git -C plugins/cosmosys checkout "${COSMOSYS_REVISION}" \
