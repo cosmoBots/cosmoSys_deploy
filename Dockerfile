@@ -26,7 +26,7 @@ RUN git clone --filter=blob:none https://github.com/cosmoBots/rspreadsheet.git /
     && test "$(git -C /opt/rspreadsheet rev-parse HEAD)" = "${RSPREADSHEET_REVISION}" \
     && rm -rf /opt/rspreadsheet/.git
 
-ARG COSMOSYS_REVISION=267711d3b3a8b3b207cd9af4d1f4b1b2b4cd1092
+ARG COSMOSYS_REVISION=7318bacf1d97354c28414c636fe6dfbf699e3965
 
 RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys.git plugins/cosmosys \
     && git -C plugins/cosmosys checkout "${COSMOSYS_REVISION}" \
@@ -43,7 +43,7 @@ COPY bootstrap /opt/cosmosys-deploy/bootstrap
 
 FROM cosmosys_base AS cosmosys_requirements
 
-ARG COSMOSYS_REQ_REVISION=5eb7493b0955f3745eaec038647ebd38b7bd3791
+ARG COSMOSYS_REQ_REVISION=31f9aaf527c258b127c3e429c36b3a4c9e411b29
 
 RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys_Req.git plugins/cosmosys_req \
     && git -C plugins/cosmosys_req checkout "${COSMOSYS_REQ_REVISION}" \
