@@ -3,9 +3,6 @@
 ARG REDMINE_IMAGE=redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1
 FROM ${REDMINE_IMAGE} AS cosmosys_base
 
-ARG COSMOSYS_REVISION=267711d3b3a8b3b207cd9af4d1f4b1b2b4cd1092
-ARG RSPREADSHEET_REVISION=c01d413abc728db9d62aa1bebe776f548ee69999
-
 COPY config/database.yml config/database.yml
 
 RUN apt-get -o Acquire::Retries=5 update \
@@ -22,10 +19,14 @@ RUN mkdir -p -m 0700 /root/.ssh \
        done \
     && test -s /root/.ssh/known_hosts
 
+ARG RSPREADSHEET_REVISION=c01d413abc728db9d62aa1bebe776f548ee69999
+
 RUN git clone --filter=blob:none https://github.com/cosmoBots/rspreadsheet.git /opt/rspreadsheet \
     && git -C /opt/rspreadsheet checkout "${RSPREADSHEET_REVISION}" \
     && test "$(git -C /opt/rspreadsheet rev-parse HEAD)" = "${RSPREADSHEET_REVISION}" \
     && rm -rf /opt/rspreadsheet/.git
+
+ARG COSMOSYS_REVISION=267711d3b3a8b3b207cd9af4d1f4b1b2b4cd1092
 
 RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys.git plugins/cosmosys \
     && git -C plugins/cosmosys checkout "${COSMOSYS_REVISION}" \
