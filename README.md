@@ -113,6 +113,31 @@ idempotently; ordinary facade pages are created once and then belong to the
 administrator. Run `scripts/bootstrap-content.sh` to reapply the current
 package explicitly.
 
+## Periodic item-tree audit
+
+Run the exhaustive, read-only audit against the active deployment with:
+
+```sh
+./scripts/audit-trees.sh
+```
+
+It exits successfully when every project tree is coherent. If it detects an
+anomaly, it emits a structured JSON report, returns a non-zero status and
+emails every active administrator with a configured address. It never repairs
+data. Repair remains a separate, explicit administrator action.
+
+The host administrator can schedule the same command with cron or a systemd
+timer. For example, from this repository, a daily cron entry can invoke:
+
+```cron
+17 3 * * * cd /srv/cosmosys-deploy && ./scripts/audit-trees.sh >> var/tree-audit.log 2>&1
+```
+
+Create and rotate the host-side log directory according to the installation's
+operations policy. For the Requirements composition, give the scheduled
+process the same `COSMOSYS_VARIANT=requirements` and optional
+`COSMOSYS_COMPOSE_PROJECT` environment used by the deployment.
+
 - Copyright and authorship: cosmoBots.eu
 - Contact: txinto@elporis.com
 - Licence: GNU General Public License version 3; see `LICENSE`.
