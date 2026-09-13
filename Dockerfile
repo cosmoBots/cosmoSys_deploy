@@ -41,6 +41,9 @@ RUN bundle install \
 
 COPY bootstrap /opt/cosmosys-deploy/bootstrap
 
+LABEL eu.cosmobots.cosmosys.revision="${COSMOSYS_REVISION}" \
+      eu.cosmobots.rspreadsheet.revision="${RSPREADSHEET_REVISION}"
+
 FROM cosmosys_base AS cosmosys_requirements
 
 ARG COSMOSYS_REQ_REVISION=31f9aaf527c258b127c3e429c36b3a4c9e411b29
@@ -51,3 +54,5 @@ RUN --mount=type=ssh git clone --filter=blob:none git@github.com:cosmoBots/cosmo
     && rm -rf plugins/cosmosys_req/.git \
     && bundle install \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+
+LABEL eu.cosmobots.cosmosys-req.revision="${COSMOSYS_REQ_REVISION}"

@@ -4,8 +4,6 @@ set -eu
 . "$(dirname -- "$0")/deployment-lib.sh"
 
 backup_directory=${1:-}
-database_name=${POSTGRES_DB:-redmine}
-database_user=${POSTGRES_USER:-redmine}
 
 if [ -z "$backup_directory" ]; then
   echo "Usage: RESTORE_CONFIRMATION=ERASE_EXISTING_COSMOSYS_DATA $0 BACKUP_DIRECTORY" >&2
@@ -35,14 +33,18 @@ fi
   sha256sum --check SHA256SUMS
 )
 
+deployment_read_database_identity
+
 deployment_compose stop redmine >/dev/null
 
 deployment_compose exec -T db \
   dropdb --username "$database_user" --if-exists --force "$database_name"
 deployment_compose exec -T db \
   createdb --username "$database_user" --owner "$database_user" "$database_name"
+# Restored objects belong to this instance's database user, even when the
+# backup comes from an instance that uses another one.
 deployment_compose exec -T db \
-  pg_restore --username "$database_user" --dbname "$database_name" \
+  pg_restore --username "$database_user" --dbname "$database_name" --no-owner \
   <"$backup_directory/database.dump"
 
 deployment_compose run --rm --no-deps --entrypoint sh redmine \

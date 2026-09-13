@@ -54,6 +54,22 @@ checksummed directory:
 ./scripts/backup.sh
 ```
 
+The manifest describes the running stack rather than the current configuration:
+its Compose project, database, Redmine image and the source revisions labelled
+in that image. An environment file that already names a revision not yet built
+or activated therefore cannot misreport a backup. Images built before those
+labels existed record `unknown` until they are rebuilt.
+
+An instance configured through a file other than `.env` is addressed with
+`COSMOSYS_ENV_FILE`, which backup, restore and `scripts/bootstrap-content.sh`
+pass to Compose. A relative path resolves from the current directory, and a
+`COMPOSE_PROJECT_NAME` in that file selects the Compose project unless
+`COSMOSYS_COMPOSE_PROJECT` overrides it:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/instance.env ./scripts/backup.sh
+```
+
 For the Requirements composition, set `COSMOSYS_VARIANT=requirements` for both
 backup and restore. Restore is intentionally explicit and destructive:
 
