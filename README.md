@@ -114,6 +114,11 @@ The default Redmine and PostgreSQL images, plugin sources and rspreadsheet
 source are pinned to immutable revisions. Updating one is a deliberate change
 that must be validated for both deployment variants.
 
+Those revisions and the base image are declared only in the Compose files and
+`.env`, so the image is built through Compose. A direct `docker build` has to
+pass them as build arguments and stops with an explicit message when one is
+missing.
+
 Database configuration is supplied as an ERB file that consumes only the
 standard container environment variables. This also lets the one-shot
 migration service boot Rails before the web service is started.
