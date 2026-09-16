@@ -156,11 +156,11 @@ publishes no port: instances reach it through the external network
 Provision each instance with a unique name and a new environment file kept
 outside source control. The script creates the role and the database, generates
 the database password, `REDMINE_SECRET_KEY_BASE` and the initial administrator
-password, and refuses to reuse an existing file, role or database. The optional
-last argument is the local HTTP port:
+password, and refuses to reuse an existing file, role or database.
+`--http-port` sets the local HTTP port, which is otherwise chosen at random:
 
 ```sh
-./scripts/provision-shared-db.sh alpha /srv/cosmosys/alpha.env 3101
+./scripts/provision-instance.sh --http-port 3101 alpha /srv/cosmosys/alpha.env
 ```
 
 The generated file sets `COSMOSYS_DB_MODE=shared`, so the deployment scripts

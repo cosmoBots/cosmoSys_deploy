@@ -8,7 +8,8 @@ unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_INITIAL_ADMIN_PASSWORD COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE \
   COSMOSYS_HTTP_PORT COSMOSYS_DB_MODE COSMOSYS_DB_HOST COSMOSYS_DB_NETWORK \
   COSMOSYS_DB_ADMIN_USER COSMOSYS_DB_CONNECTION_LIMIT COSMOSYS_COMPOSE_PROJECT \
-  COSMOSYS_VARIANT COSMOSYS_ENV_FILE COMPOSE_PROJECT_NAME
+  COSMOSYS_VARIANT COSMOSYS_ENV_FILE COMPOSE_PROJECT_NAME \
+  COSMOSYS_PROXY_MODE COSMOSYS_HOSTNAME COSMOSYS_PROXY_TLS COSMOSYS_PROXY_NETWORK
 
 suffix=$$
 validation_directory=$(mktemp -d)
@@ -72,10 +73,10 @@ start_instance() {
 echo "Starting shared PostgreSQL validation as $COSMOSYS_SHARED_DB_PROJECT..."
 shared_compose up -d --wait postgres
 
-provision="$deployment_repository_dir/scripts/provision-shared-db.sh"
-"$provision" "$instance_a" "$env_a" 0 >/dev/null
-"$provision" "$instance_b" "$env_b" 0 >/dev/null
-if "$provision" "$instance_a" "$validation_directory/again.env" 0 >/dev/null 2>&1; then
+provision="$deployment_repository_dir/scripts/provision-instance.sh"
+"$provision" "$instance_a" "$env_a" >/dev/null
+"$provision" "$instance_b" "$env_b" >/dev/null
+if "$provision" "$instance_a" "$validation_directory/again.env" >/dev/null 2>&1; then
   echo "Provisioning accepted an instance that already exists" >&2
   exit 1
 fi
