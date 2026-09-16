@@ -33,17 +33,26 @@ fi
   sha256sum --check SHA256SUMS
 )
 
+database_mode=$(deployment_db_mode)
 deployment_read_database_identity
 
 deployment_compose stop redmine >/dev/null
 
-deployment_compose exec -T db \
-  dropdb --username "$database_user" --if-exists --force "$database_name"
-deployment_compose exec -T db \
-  createdb --username "$database_user" --owner "$database_user" "$database_name"
+if [ "$database_mode" = shared ]; then
+  # A shared-server role owns its database but may not recreate it, so it
+  # removes the objects it owns instead.
+  deployment_db_client \
+    psql --username "$database_user" --dbname "$database_name" \
+    --set ON_ERROR_STOP=1 --quiet --command 'DROP OWNED BY CURRENT_USER'
+else
+  deployment_db_client \
+    dropdb --username "$database_user" --if-exists --force "$database_name"
+  deployment_db_client \
+    createdb --username "$database_user" --owner "$database_user" "$database_name"
+fi
 # Restored objects belong to this instance's database user, even when the
 # backup comes from an instance that uses another one.
-deployment_compose exec -T db \
+deployment_db_client \
   pg_restore --username "$database_user" --dbname "$database_name" --no-owner \
   <"$backup_directory/database.dump"
 
