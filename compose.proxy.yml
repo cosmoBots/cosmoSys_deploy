@@ -1,0 +1,22 @@
+# Overlay for instances published through the shared reverse proxy of
+# proxy/compose.yml, which discovers the web service through these labels.
+
+services:
+  bootstrap:
+    environment:
+      COSMOSYS_HOSTNAME: ${COSMOSYS_HOSTNAME:?Set COSMOSYS_HOSTNAME for the reverse proxy}
+
+  redmine:
+    labels:
+      caddy: ${COSMOSYS_HOSTNAME:?Set COSMOSYS_HOSTNAME for the reverse proxy}
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+      caddy.tls: ${COSMOSYS_PROXY_TLS:?Set COSMOSYS_PROXY_TLS to an ACME e-mail address or internal}
+      caddy_ingress_network: ${COSMOSYS_PROXY_NETWORK:-caddy_proxy}
+    networks:
+      - default
+      - proxy
+
+networks:
+  proxy:
+    name: ${COSMOSYS_PROXY_NETWORK:-caddy_proxy}
+    external: true

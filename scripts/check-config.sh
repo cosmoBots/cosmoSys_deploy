@@ -10,13 +10,21 @@ test -f .env || {
 }
 
 shared_admin_password=${COSMOSYS_DB_ADMIN_PASSWORD:-configuration-check}
+proxy_hostname=${COSMOSYS_HOSTNAME:-csys.example.org}
+proxy_tls=${COSMOSYS_PROXY_TLS:-internal}
 
 docker compose -f compose.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml config --quiet
 docker compose -f compose.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml -f compose.shared-db.yml config --quiet
+COSMOSYS_HOSTNAME=$proxy_hostname COSMOSYS_PROXY_TLS=$proxy_tls \
+  docker compose -f compose.yml -f compose.proxy.yml config --quiet
+COSMOSYS_HOSTNAME=$proxy_hostname COSMOSYS_PROXY_TLS=$proxy_tls \
+  docker compose -f compose.yml -f compose.requirements.yml -f compose.shared-db.yml \
+  -f compose.proxy.yml config --quiet
 COSMOSYS_DB_ADMIN_PASSWORD=$shared_admin_password \
   docker compose -f shared-db/compose.yml config --quiet
+docker compose -f proxy/compose.yml config --quiet
 
 # The shared server, the instance database and the backup client must agree.
 postgres_images=$(
@@ -33,4 +41,4 @@ if [ "$(printf '%s\n' "$postgres_images" | grep -c .)" -ne 1 ]; then
   exit 1
 fi
 
-echo "Both cosmoSys deployment variants and the shared PostgreSQL mode have valid Compose configuration."
+echo "The deployment variants, the shared PostgreSQL mode and the reverse proxy have valid Compose configuration."
