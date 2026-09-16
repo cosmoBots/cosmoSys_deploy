@@ -63,8 +63,9 @@ COSMOSYS_DB_NETWORK=csys_db_validation_$suffix
 COSMOSYS_DB_HOST=csys-db-validation-$suffix
 EOF
 
+# Only one Redmine runs at a time, so the validation fits on small hosts.
 start_instance() {
-  if ! instance_compose "$1" "$2" up -d --wait redmine; then
+  if ! instance_compose "$1" "$2" up -d --wait --build redmine; then
     instance_compose "$1" "$2" logs --no-color --tail 100 migrate bootstrap redmine >&2 || true
     return 1
   fi
@@ -83,7 +84,14 @@ fi
 test ! -e "$validation_directory/again.env"
 
 start_instance "$env_a" base
+instance_compose "$env_a" base exec -T redmine bundle exec rails runner \
+  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort('cosmosys missing') unless actual.include?('cosmosys'); abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req'); abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
+instance_compose "$env_a" base stop redmine >/dev/null
+
 start_instance "$env_b" requirements
+instance_compose "$env_b" requirements exec -T redmine bundle exec rails runner \
+  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = %w[cosmosys cosmosys_req] - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
+instance_compose "$env_b" requirements stop redmine >/dev/null
 
 for project in "csys_$instance_a" "csys_$instance_b"; do
   if [ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project" \
@@ -92,11 +100,6 @@ for project in "csys_$instance_a" "csys_$instance_b"; do
     exit 1
   fi
 done
-
-instance_compose "$env_a" base exec -T redmine bundle exec rails runner \
-  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort('cosmosys missing') unless actual.include?('cosmosys'); abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req'); abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
-instance_compose "$env_b" requirements exec -T redmine bundle exec rails runner \
-  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = %w[cosmosys cosmosys_req] - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
 
 privileged=$(shared_compose exec -T postgres psql -U postgres -d postgres -tAc \
   "SELECT count(*) FROM pg_roles WHERE rolname IN ('csys_$instance_a', 'csys_$instance_b') AND (rolsuper OR rolcreatedb)")
@@ -117,6 +120,7 @@ db_a() {
     psql --tuples-only --no-align --set ON_ERROR_STOP=1 "$@"
 }
 
+start_instance "$env_a" base
 db_a --command "CREATE TABLE csys_restore_probe (value text NOT NULL); INSERT INTO csys_restore_probe VALUES ('database-before-backup');" \
   >/dev/null
 instance_compose "$env_a" base exec -T redmine sh -c \
@@ -150,10 +154,9 @@ file_value=$(instance_compose "$env_a" base exec -T redmine \
 test "$database_value" = database-before-backup
 test "$file_value" = files-before-backup
 
-instance_compose "$env_b" requirements exec -T redmine ruby -rnet/http -e \
-  "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/')).is_a?(Net::HTTPSuccess) ? 0 : 1)"
-b_probe_tables=$(instance_compose "$env_b" requirements run --rm --no-deps -T db-client \
-  psql --tuples-only --no-align --command "SELECT count(*) FROM pg_tables WHERE tablename = 'csys_restore_probe'")
-test "$b_probe_tables" = 0
+b_state=$(instance_compose "$env_b" requirements run --rm --no-deps -T db-client \
+  psql --tuples-only --no-align --command \
+  "SELECT (SELECT count(*) FROM pg_tables WHERE tablename = 'csys_restore_probe') || ',' || (SELECT count(*) FROM projects WHERE identifier = 'csys_help')")
+test "$b_state" = "0,1"
 
 echo "Shared PostgreSQL validation passed."
