@@ -1,0 +1,48 @@
+# Overlay for instances whose database lives on the shared PostgreSQL server
+# of shared-db/compose.yml. The local db service is disabled and db-client runs
+# the PostgreSQL tools used by backup and restore.
+
+x-shared-db-service: &shared-db-service
+  depends_on:
+    db:
+      condition: service_healthy
+      required: false
+  environment:
+    REDMINE_DB_POSTGRES: ${COSMOSYS_DB_HOST:-csys-db}
+    REDMINE_DB_PORT: ${COSMOSYS_DB_PORT:-5432}
+  networks:
+    - default
+    - shared-db
+
+services:
+  db:
+    profiles:
+      - local-db
+
+  db-client:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}
+    profiles:
+      - tools
+    restart: "no"
+    environment:
+      PGHOST: ${COSMOSYS_DB_HOST:-csys-db}
+      PGPORT: ${COSMOSYS_DB_PORT:-5432}
+      PGDATABASE: ${POSTGRES_DB:-redmine}
+      PGUSER: ${POSTGRES_USER:-redmine}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    networks:
+      - shared-db
+
+  migrate:
+    <<: *shared-db-service
+
+  bootstrap:
+    <<: *shared-db-service
+
+  redmine:
+    <<: *shared-db-service
+
+networks:
+  shared-db:
+    name: ${COSMOSYS_DB_NETWORK:-csys_db}
+    external: true

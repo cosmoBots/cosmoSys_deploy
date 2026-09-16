@@ -1,0 +1,28 @@
+name: csys_db
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine@sha256:20edbde7749f822887a1a022ad526fde0a47d6b2be9a8364433605cf65099416}
+    restart: unless-stopped
+    command: ["postgres", "-c", "max_connections=${COSMOSYS_DB_MAX_CONNECTIONS:-100}"]
+    environment:
+      POSTGRES_USER: ${COSMOSYS_DB_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${COSMOSYS_DB_ADMIN_PASSWORD:?Set COSMOSYS_DB_ADMIN_PASSWORD in shared-db/.env}
+    volumes:
+      - data:/var/lib/postgresql/data
+    networks:
+      shared-db:
+        aliases:
+          - ${COSMOSYS_DB_HOST:-csys-db}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+networks:
+  shared-db:
+    name: ${COSMOSYS_DB_NETWORK:-csys_db}
+
+volumes:
+  data:
