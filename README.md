@@ -159,6 +159,10 @@ operations policy. For the Requirements composition, give the scheduled
 process the same `COSMOSYS_VARIANT=requirements` and optional
 `COSMOSYS_COMPOSE_PROJECT` environment used by the deployment.
 
+When the deployment is configured through its own environment file rather than
+`.env`, also give the scheduled process `COSMOSYS_ENV_FILE` pointing at that
+file.
+
 - Copyright and authorship: cosmoBots.eu
 - Contact: txinto@elporis.com
 - Licence: GNU General Public License version 3; see `LICENSE`.
