@@ -134,6 +134,67 @@ idempotently; ordinary facade pages are created once and then belong to the
 administrator. Run `scripts/bootstrap-content.sh` to reapply the current
 package explicitly.
 
+## Shared PostgreSQL server
+
+Several instances on one host can share a single PostgreSQL server instead of
+running a database container each. Every instance keeps its own role and
+database. The roles are neither superusers nor allowed to create databases,
+and they cannot connect to the databases of other instances.
+
+Copy `shared-db/.env.example` to `shared-db/.env`, replace
+`COSMOSYS_DB_ADMIN_PASSWORD` and start the shared server once:
+
+```sh
+docker compose -f shared-db/compose.yml up -d --wait
+```
+
+The administrator account is used only to provision instances. The server
+publishes no port: instances reach it through the external network
+`COSMOSYS_DB_NETWORK` (`csys_db` by default) under the host name
+`COSMOSYS_DB_HOST` (`csys-db`).
+
+Provision each instance with a unique name and a new environment file kept
+outside source control. The script creates the role and the database, generates
+the database password, `REDMINE_SECRET_KEY_BASE` and the initial administrator
+password, and refuses to reuse an existing file, role or database. The optional
+last argument is the local HTTP port:
+
+```sh
+./scripts/provision-shared-db.sh alpha /srv/cosmosys/alpha.env 3101
+```
+
+The generated file sets `COSMOSYS_DB_MODE=shared`, so the deployment scripts
+add `compose.shared-db.yml` by themselves when they receive it through
+`COSMOSYS_ENV_FILE`. Direct Compose commands must name the overlay:
+
+```sh
+docker compose --env-file /srv/cosmosys/alpha.env \
+  -f compose.yml -f compose.shared-db.yml up -d
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/backup.sh
+```
+
+For the Requirements variant, add `compose.requirements.yml` to direct commands
+and `COSMOSYS_VARIANT=requirements` to the scripts. Give every instance a
+distinct `COSMOSYS_HTTP_PORT`, or `0` for a random local port.
+
+In shared mode, backups and restores run the PostgreSQL tools in a disposable
+`db-client` container with the instance credentials. A restore removes the
+objects owned by the instance role and loads the dump into the same database,
+leaving other instances untouched.
+
+Each instance uses at most five connections from the Rails pool, plus
+short-lived ones for migrations, bootstrap and backups. Provisioned roles are
+limited to `COSMOSYS_DB_CONNECTION_LIMIT` (20) connections, and the default
+`COSMOSYS_DB_MAX_CONNECTIONS` of 100 serves about fifteen instances. Stopping
+or upgrading the shared server affects every instance that uses it, and the
+overlay requires Docker Compose 2.20 or later.
+
+Validate the shared mode end to end with two disposable instances:
+
+```sh
+./scripts/validate-shared-db.sh
+```
+
 ## Periodic item-tree audit
 
 Run the exhaustive, read-only audit against the active deployment with:

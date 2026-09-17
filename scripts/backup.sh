@@ -8,6 +8,7 @@ timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 final_directory="$backup_root/$timestamp"
 temporary_directory="$backup_root/.${timestamp}.$$"
 variant=${COSMOSYS_VARIANT:-base}
+database_mode=$(deployment_db_mode)
 
 redmine_container=$(deployment_compose ps -q redmine)
 if [ -z "$redmine_container" ]; then
@@ -54,7 +55,7 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-deployment_compose exec -T db \
+deployment_db_client \
   pg_dump --username "$database_user" --dbname "$database_name" --format custom \
   >"$temporary_directory/database.dump"
 
@@ -67,6 +68,7 @@ deployment_compose exec -T redmine \
   echo "created_at=$timestamp"
   echo "variant=$variant"
   echo "compose_project=$compose_project"
+  echo "database_mode=$database_mode"
   echo "database=$database_name"
   echo "database_user=$database_user"
   echo "redmine_image=$redmine_image"
