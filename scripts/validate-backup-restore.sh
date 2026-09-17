@@ -7,7 +7,7 @@ set -eu
 # database names, so backup and restore cannot rely on the shell or defaults.
 unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_INITIAL_ADMIN_PASSWORD COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE \
-  COSMOSYS_HTTP_PORT COSMOSYS_DB_MODE
+  COSMOSYS_HTTP_PORT COSMOSYS_DB_MODE COSMOSYS_PROXY_MODE
 
 validation_directory=$(mktemp -d)
 validation_database=csys_validation_database

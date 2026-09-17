@@ -156,11 +156,11 @@ publishes no port: instances reach it through the external network
 Provision each instance with a unique name and a new environment file kept
 outside source control. The script creates the role and the database, generates
 the database password, `REDMINE_SECRET_KEY_BASE` and the initial administrator
-password, and refuses to reuse an existing file, role or database. The optional
-last argument is the local HTTP port:
+password, and refuses to reuse an existing file, role or database.
+`--http-port` sets the local HTTP port, which is otherwise chosen at random:
 
 ```sh
-./scripts/provision-shared-db.sh alpha /srv/cosmosys/alpha.env 3101
+./scripts/provision-instance.sh --http-port 3101 alpha /srv/cosmosys/alpha.env
 ```
 
 The generated file sets `COSMOSYS_DB_MODE=shared`, so the deployment scripts
@@ -193,6 +193,52 @@ Validate the shared mode end to end with two disposable instances:
 
 ```sh
 ./scripts/validate-shared-db.sh
+```
+
+## Shared reverse proxy
+
+One reverse proxy per host publishes the instances under their own host names.
+It discovers them through Docker labels, so starting or stopping an instance
+adds or removes its route without editing or reloading the proxy.
+
+```sh
+cp proxy/.env.example proxy/.env
+docker compose -f proxy/compose.yml up -d --wait
+```
+
+The proxy is caddy-docker-proxy, the only service that publishes ports (80 and
+443 by default). It reads the Docker API through a read-only socket proxy on an
+internal network, so neither the proxy nor the instances mount the Docker
+socket. Published instances join the external network `COSMOSYS_PROXY_NETWORK`
+(`caddy_proxy` by default, as on the previous deployment). A host that already
+runs caddy-docker-proxy can keep it: point that variable at its ingress network
+and skip this project.
+
+Provision an instance with a public host name to publish it:
+
+```sh
+./scripts/provision-instance.sh --hostname alpha.csys.example.org \
+  --tls admin@example.org alpha /srv/cosmosys/alpha.env
+```
+
+`--tls` takes the e-mail address of the Let's Encrypt account, which requires
+the name to resolve publicly to this host and ports 80 and 443 to be reachable,
+or `internal` for certificates from Caddy's own authority. Without `--tls` the
+script uses `COSMOSYS_PROXY_TLS` from the shell or `proxy/.env`. The generated
+file sets `COSMOSYS_PROXY_MODE=shared`, so the scripts add `compose.proxy.yml`;
+direct Compose commands must name it as well. The local HTTP port stays on the
+loopback interface and is chosen at random, so instances never collide.
+
+On first start the bootstrap sets Redmine's host name and protocol to the
+public HTTPS address, unless an administrator has already changed them. A
+wildcard DNS record such as `*.csys.example.org` lets new instances go live
+without further DNS changes.
+
+Validate routing, route removal and the isolation of the Docker API with a
+disposable proxy and instance:
+
+```sh
+./scripts/validate-proxy.sh
 ```
 
 ## Periodic item-tree audit

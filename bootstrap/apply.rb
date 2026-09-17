@@ -28,6 +28,21 @@ else
   puts 'Administrator account already managed; keeping its current password'
 end
 
+public_host = ENV['COSMOSYS_HOSTNAME'].to_s.strip
+unless public_host.empty?
+  # Behind the reverse proxy links must use the public HTTPS address. Only
+  # factory values are replaced, so administrator choices are kept.
+  { 'host_name' => public_host, 'protocol' => 'https' }.each do |name, value|
+    current = Setting.send(name)
+    if current == Setting.available_settings.fetch(name).fetch('default')
+      Setting.send("#{name}=", value)
+      puts "Configured #{name} as #{value}"
+    elsif current != value
+      puts "Keeping administrator-managed #{name} #{current.inspect}"
+    end
+  end
+end
+
 Setting.define_setting(registry_setting, 'default' => {}, 'serialized' => true) \
   unless Setting.available_settings.key?(registry_setting)
 registry = Setting[registry_setting]
