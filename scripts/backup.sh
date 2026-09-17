@@ -7,8 +7,38 @@ backup_root=${1:-"$deployment_repository_dir/backups"}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 final_directory="$backup_root/$timestamp"
 temporary_directory="$backup_root/.${timestamp}.$$"
-database_name=${POSTGRES_DB:-redmine}
-database_user=${POSTGRES_USER:-redmine}
+variant=${COSMOSYS_VARIANT:-base}
+
+redmine_container=$(deployment_compose ps -q redmine)
+if [ -z "$redmine_container" ]; then
+  echo "The redmine service is not running" >&2
+  exit 1
+fi
+
+# Describe the running container rather than the configuration: an
+# environment file may already name revisions that are not active yet.
+container_label() {
+  label_value=$(docker inspect --format "{{index .Config.Labels \"$1\"}}" "$redmine_container")
+  case "$label_value" in
+    ''|'<no value>') echo unknown ;;
+    *) echo "$label_value" ;;
+  esac
+}
+
+compose_project=$(container_label com.docker.compose.project)
+redmine_image=$(docker inspect --format '{{.Image}}' "$redmine_container")
+cosmosys_revision=$(container_label eu.cosmobots.cosmosys.revision)
+rspreadsheet_revision=$(container_label eu.cosmobots.rspreadsheet.revision)
+cosmosys_req_revision=
+if [ "$variant" = requirements ]; then
+  cosmosys_req_revision=$(container_label eu.cosmobots.cosmosys-req.revision)
+fi
+
+if [ "$cosmosys_revision" = unknown ]; then
+  echo "Warning: the running Redmine image has no revision labels; rebuild it to record source revisions." >&2
+fi
+
+deployment_read_database_identity
 
 mkdir -p "$backup_root"
 if [ -e "$final_directory" ]; then
@@ -35,12 +65,16 @@ deployment_compose exec -T redmine \
 {
   echo "format=cosmosys-backup-v1"
   echo "created_at=$timestamp"
-  echo "variant=${COSMOSYS_VARIANT:-base}"
+  echo "variant=$variant"
+  echo "compose_project=$compose_project"
   echo "database=$database_name"
   echo "database_user=$database_user"
-  echo "cosmosys_revision=${COSMOSYS_REVISION:-1d940430da077fb408dcbc14e94337ce9b9da288}"
-  echo "cosmosys_req_revision=${COSMOSYS_REQ_REVISION:-31f9aaf527c258b127c3e429c36b3a4c9e411b29}"
-  echo "rspreadsheet_revision=${RSPREADSHEET_REVISION:-c01d413abc728db9d62aa1bebe776f548ee69999}"
+  echo "redmine_image=$redmine_image"
+  echo "cosmosys_revision=$cosmosys_revision"
+  if [ -n "$cosmosys_req_revision" ]; then
+    echo "cosmosys_req_revision=$cosmosys_req_revision"
+  fi
+  echo "rspreadsheet_revision=$rspreadsheet_revision"
 } >"$temporary_directory/manifest.env"
 
 (

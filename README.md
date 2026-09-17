@@ -54,6 +54,22 @@ checksummed directory:
 ./scripts/backup.sh
 ```
 
+The manifest describes the running stack rather than the current configuration:
+its Compose project, database, Redmine image and the source revisions labelled
+in that image. An environment file that already names a revision not yet built
+or activated therefore cannot misreport a backup. Images built before those
+labels existed record `unknown` until they are rebuilt.
+
+An instance configured through a file other than `.env` is addressed with
+`COSMOSYS_ENV_FILE`, which backup, restore and `scripts/bootstrap-content.sh`
+pass to Compose. A relative path resolves from the current directory, and a
+`COMPOSE_PROJECT_NAME` in that file selects the Compose project unless
+`COSMOSYS_COMPOSE_PROJECT` overrides it:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/instance.env ./scripts/backup.sh
+```
+
 For the Requirements composition, set `COSMOSYS_VARIANT=requirements` for both
 backup and restore. Restore is intentionally explicit and destructive:
 
@@ -98,6 +114,11 @@ The default Redmine and PostgreSQL images, plugin sources and rspreadsheet
 source are pinned to immutable revisions. Updating one is a deliberate change
 that must be validated for both deployment variants.
 
+Those revisions and the base image are declared only in the Compose files and
+`.env`, so the image is built through Compose. A direct `docker build` has to
+pass them as build arguments and stops with an explicit message when one is
+missing.
+
 Database configuration is supplied as an ERB file that consumes only the
 standard container environment variables. This also lets the one-shot
 migration service boot Rails before the web service is started.
@@ -137,6 +158,10 @@ Create and rotate the host-side log directory according to the installation's
 operations policy. For the Requirements composition, give the scheduled
 process the same `COSMOSYS_VARIANT=requirements` and optional
 `COSMOSYS_COMPOSE_PROJECT` environment used by the deployment.
+
+When the deployment is configured through its own environment file rather than
+`.env`, also give the scheduled process `COSMOSYS_ENV_FILE` pointing at that
+file.
 
 - Copyright and authorship: cosmoBots.eu
 - Contact: txinto@elporis.com

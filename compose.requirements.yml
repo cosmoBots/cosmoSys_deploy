@@ -9,5 +9,8 @@ services:
   migrate:
     <<: *requirements-image
 
+  bootstrap:
+    <<: *requirements-image
+
   redmine:
     <<: *requirements-image
