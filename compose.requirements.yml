@@ -1,9 +1,9 @@
 x-requirements-image: &requirements-image
-  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:7819c0b-c66d6b5-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:7819c0b-8b89027-redmine-7.0.1}
   build:
     target: cosmosys_requirements
     args:
-      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-c66d6b5bff185d817692e8971a1103e0c23fcec0}
+      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-8b890276f434cc703697faebc36ade00c2571e64}
 
 services:
   migrate:

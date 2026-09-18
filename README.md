@@ -127,7 +127,7 @@ Current pins (see `.env.example` and `compose*.yml`):
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
 | [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.4 | `7819c0b` | `0.1.4` |
-| cosmoSys Requirements | 0.3.0 | `c66d6b5` | `0.3.0` |
+| cosmoSys Requirements | 0.3.0 | `8b89027` | `0.3.0` |
 | rspreadsheet | pin | `c01d413` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
