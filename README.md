@@ -114,6 +114,37 @@ The default Redmine and PostgreSQL images, plugin sources and rspreadsheet
 source are pinned to immutable revisions. Updating one is a deliberate change
 that must be validated for both deployment variants.
 
+## Components and source revisions
+
+This deployment installs two cosmoSys plugins on top of the pinned Redmine
+image. For every change, each plugin repository declares a semantic version
+and a release tag; the deployment pins the exact commit (and therefore the
+tagged release) that was validated.
+
+Current pins (see `.env.example` and `compose*.yml`):
+
+| Component | Version | Commit | Tag |
+| --- | --- | --- | --- |
+| Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.4 | `7819c0b` | `0.1.4` |
+| cosmoSys Requirements | 0.3.0 | `c66d6b5` | `0.3.0` |
+| rspreadsheet | pin | `c01d413` | n/a |
+
+The base variant installs `cosmoSys` only; the requirements variant adds
+`cosmoSys Requirements`. The image tags embed the short commit of each plugin
+(`cosmobots/cosmosys:<cosmosys_short>-redmine-7.0.1` and
+`cosmobots/cosmosys-req:<cosmosys_short>-<req_short>-redmine-7.0.1`), so the
+running image identifies the exact plugin revision.
+
+**Versioning strategy.** The plugins own their version numbers (declared in
+their `init.rb`) and their release tags; the deployment repository does not
+duplicate them. This repository has no version number of its own: it follows
+the plugins and pins what it validated. The plugins' `init.rb` version and its
+git tag must always agree, and the deployment's `COSMOSYS_REVISION` /
+`COSMOSYS_REQ_REVISION` pin the exact commit behind that tag. When a plugin
+publishes a new tag, update the pins here and validate both variants before
+committing.
+
 Those revisions and the base image are declared only in the Compose files and
 `.env`, so the image is built through Compose. A direct `docker build` has to
 pass them as build arguments and stops with an explicit message when one is
