@@ -5,8 +5,6 @@ x-redmine-image: &redmine-image
   build:
     context: .
     target: cosmosys_base
-    ssh:
-      - default
     args:
       REDMINE_IMAGE: ${REDMINE_IMAGE:-redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1}
       COSMOSYS_REVISION: ${COSMOSYS_REVISION:-7819c0bfb5ec3f95e3d696d05f5211763a234f61}

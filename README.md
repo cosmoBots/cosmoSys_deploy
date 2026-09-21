@@ -16,9 +16,9 @@ cp .env.example .env
 ```
 
 Replace `POSTGRES_PASSWORD` and `REDMINE_SECRET_KEY_BASE`. Generate the latter,
-for example, with `openssl rand -hex 64`. The repository currently uses SSH
-forwarding during image construction because the plugin repositories are
-private; load an authorized GitHub key into your SSH agent first.
+for example, with `openssl rand -hex 64`. Building the images needs nothing but
+Docker and network access to github.com: the plugin repositories are public and
+are cloned anonymously over HTTPS.
 
 Set `COSMOSYS_INITIAL_ADMIN_PASSWORD` before the first start. The bootstrap
 replaces Redmine's unsafe `admin`/`admin` credentials before the web service is

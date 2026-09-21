@@ -11,14 +11,6 @@ RUN apt-get -o Acquire::Retries=5 update \
     && gem install andand libxml-ruby rubyzip --no-document \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p -m 0700 /root/.ssh \
-    && for attempt in 1 2 3 4 5; do \
-         ssh-keyscan -t ed25519 github.com > /root/.ssh/known_hosts && break; \
-         test "$attempt" -eq 5 && exit 1; \
-         sleep 2; \
-       done \
-    && test -s /root/.ssh/known_hosts
-
 ARG RSPREADSHEET_REVISION
 
 RUN : "${RSPREADSHEET_REVISION:?Pass RSPREADSHEET_REVISION as a build argument}" \
@@ -29,8 +21,8 @@ RUN : "${RSPREADSHEET_REVISION:?Pass RSPREADSHEET_REVISION as a build argument}"
 
 ARG COSMOSYS_REVISION
 
-RUN --mount=type=ssh : "${COSMOSYS_REVISION:?Pass COSMOSYS_REVISION as a build argument}" \
-    && git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys.git plugins/cosmosys \
+RUN : "${COSMOSYS_REVISION:?Pass COSMOSYS_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/cosmoSys.git plugins/cosmosys \
     && git -C plugins/cosmosys checkout "${COSMOSYS_REVISION}" \
     && test "$(git -C plugins/cosmosys rev-parse HEAD)" = "${COSMOSYS_REVISION}" \
     && rm -rf plugins/cosmosys/.git
@@ -50,8 +42,8 @@ FROM cosmosys_base AS cosmosys_requirements
 
 ARG COSMOSYS_REQ_REVISION
 
-RUN --mount=type=ssh : "${COSMOSYS_REQ_REVISION:?Pass COSMOSYS_REQ_REVISION as a build argument}" \
-    && git clone --filter=blob:none git@github.com:cosmoBots/cosmoSys_Req.git plugins/cosmosys_req \
+RUN : "${COSMOSYS_REQ_REVISION:?Pass COSMOSYS_REQ_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/cosmoSys_Req.git plugins/cosmosys_req \
     && git -C plugins/cosmosys_req checkout "${COSMOSYS_REQ_REVISION}" \
     && test "$(git -C plugins/cosmosys_req rev-parse HEAD)" = "${COSMOSYS_REQ_REVISION}" \
     && rm -rf plugins/cosmosys_req/.git \
