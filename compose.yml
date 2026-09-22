@@ -1,13 +1,13 @@
 name: cosmosys
 
 x-redmine-image: &redmine-image
-  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:7819c0b-redmine-7.0.1}
+  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:89c8c45-redmine-7.0.1}
   build:
     context: .
     target: cosmosys_base
     args:
       REDMINE_IMAGE: ${REDMINE_IMAGE:-redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1}
-      COSMOSYS_REVISION: ${COSMOSYS_REVISION:-7819c0bfb5ec3f95e3d696d05f5211763a234f61}
+      COSMOSYS_REVISION: ${COSMOSYS_REVISION:-89c8c45579036088465c0702de9b50c704eed094}
       RSPREADSHEET_REVISION: ${RSPREADSHEET_REVISION:-c01d413abc728db9d62aa1bebe776f548ee69999}
 
 x-redmine-environment: &redmine-environment
