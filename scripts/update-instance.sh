@@ -30,7 +30,8 @@ previous image, which does not undo a migration that already ran.
                             healthy, 300 by default.
 
 Exit status: 0 up to date or updated, 10 an update is available and was not
-applied, 3 refused, 2 usage or configuration error, 1 the update failed.
+applied, 4 another update of this instance is already running, 3 refused,
+2 usage or configuration error, 1 the update failed.
 EOF
 }
 
@@ -249,15 +250,43 @@ if [ "$database_mode" = local ]; then
   fi
 fi
 
-work_directory=$(mktemp -d)
+# Two updates of one instance at the same time would run two recreations
+# against the same Compose project, so the second one waits for another day
+# rather than for the first one: a timer firing while somebody updates by hand
+# has nothing useful to do. Instances are locked one by one, so different
+# instances on one host still update in parallel.
+lock_name=$(printf '%s' "$(deployment_setting COMPOSE_PROJECT_NAME cosmosys)" |
+  tr -c 'A-Za-z0-9_.-' '_')
+lock_directory="${COSMOSYS_UPDATE_LOCK_DIR:-${TMPDIR:-/tmp}}/cosmosys-update-$lock_name.lock"
+
+lock_acquired=0
+work_directory=
 rollback_needed=0
 
 cleanup() {
-  if [ "$rollback_needed" = 0 ]; then
+  if [ "$lock_acquired" = 1 ]; then
+    rm -rf -- "$lock_directory"
+  fi
+  if [ -n "$work_directory" ] && [ "$rollback_needed" = 0 ]; then
     rm -rf -- "$work_directory"
   fi
 }
 trap cleanup EXIT HUP INT TERM
+
+if ! mkdir "$lock_directory" 2>/dev/null; then
+  echo "Another update of this instance is already running." >&2
+  if [ -r "$lock_directory/pid" ]; then
+    echo "Its lock is $lock_directory, held by process $(cat "$lock_directory/pid")." >&2
+  else
+    echo "Its lock is $lock_directory." >&2
+  fi
+  echo "Remove that directory only after making sure that no update is running." >&2
+  exit 4
+fi
+lock_acquired=1
+printf '%s\n' "$$" >"$lock_directory/pid"
+
+work_directory=$(mktemp -d)
 
 (umask 077 && cat "$instance_env" >"$work_directory/previous.env")
 

@@ -25,6 +25,7 @@ target_req_image="cosmobots/cosmosys-req-update-validation:target-$suffix"
 
 export COSMOSYS_ENV_FILE="$validation_directory/instance.env"
 export COSMOSYS_BACKUP_ROOT="$validation_directory/backups"
+instance_lock="${TMPDIR:-/tmp}/cosmosys-update-csys_update_validation_$suffix.lock"
 
 # The release the instance starts from. The target is whatever this checkout
 # declares, so the validation follows the repository instead of a fixed pair.
@@ -56,6 +57,7 @@ cleanup() {
     return
   fi
   deployment_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+  rm -rf -- "$instance_lock"
   docker image rm -f "$baseline_image" "$baseline_req_image" \
     "$target_image" "$target_req_image" \
     "cosmobots/cosmosys-update-validation:broken-$suffix" \
@@ -183,6 +185,24 @@ fi
 
 # An instance set to auto updates unattended, which is what the timer relies on.
 set_update_mode auto
+
+echo "Checking that an instance already being updated is left alone..."
+mkdir "$instance_lock"
+update_status=0
+update --pins "$validation_directory/target.env" || update_status=$?
+rm -rf -- "$instance_lock"
+if [ "$update_status" -ne 4 ]; then
+  echo "A locked instance returned $update_status instead of 4" >&2
+  exit 1
+fi
+if [ "$(running_revision)" != "$baseline_revision" ]; then
+  echo "A locked instance was updated anyway" >&2
+  exit 1
+fi
+if [ "$(instance_setting COSMOSYS_REVISION)" != "$baseline_revision" ]; then
+  echo "A locked instance had its environment file changed" >&2
+  exit 1
+fi
 
 echo "Updating to cosmoSys $target_revision..."
 update --pins "$validation_directory/target.env"
