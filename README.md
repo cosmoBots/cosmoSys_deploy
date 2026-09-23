@@ -216,6 +216,10 @@ sudo cp systemd/cosmosys-update.conf.example /etc/default/cosmosys-update
 sudo systemctl enable --now cosmosys-update@alpha.timer
 ```
 
+Each instance is locked while it is updated, so a scheduled update and a manual
+one never recreate the same instance at once; the second one stops with status
+4. Instances on one host still update in parallel with each other.
+
 When an update fails, the script puts the previous revisions back in the
 environment file and starts the previous image, which is still on the host.
 That undoes the code but not the schema: if the migration had already run, the
@@ -232,6 +236,10 @@ instance:
 ```sh
 ./scripts/validate-update.sh
 ```
+
+[`docs/instance-updates.md`](docs/instance-updates.md) describes the sequence
+step by step, with a diagram, what each step touches, where the point of no
+return is and what a failure can cost.
 
 ## Shared PostgreSQL server
 
