@@ -238,10 +238,9 @@ command for it. For the same reason it refuses three situations rather than
 attempting them: an environment file that contradicts the running image, such
 as an instance provisioned before the variant was recorded, which would be
 rebuilt as the base variant and lose its requirements plugin; a PostgreSQL
-major version change, which needs its own dump and restore; and an unattended
-update from a checkout whose image-building files differ from `origin/main`,
-because the image tag would then name revisions without describing what is
-inside it.
+major version change, which needs its own dump and restore; and an update from a
+checkout whose image-building files differ from `origin/main`, because the
+image tag would then name revisions without describing what is inside it.
 
 Validate the whole path, a successful update and a failed one, on a disposable
 instance:

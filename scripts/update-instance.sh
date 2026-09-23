@@ -25,7 +25,8 @@ previous image, which does not undo a migration that already ran.
   --pins FILE               Take the declared versions from FILE (KEY=VALUE)
                             instead of from a git reference.
   --source REF              Git reference to read the declared versions from.
-  --allow-stale-deployment  Apply although this checkout differs from REF.
+  --allow-stale-deployment  Apply although this checkout differs from REF in
+                            the files that end up in the image.
   --timeout SECONDS         How long to wait for the instance to become
                             healthy, 300 by default.
 
@@ -140,10 +141,17 @@ else
     echo "versions cannot be read from $source_ref. Pass --pins instead." >&2
     exit 2
   fi
-  case "$source_ref" in
-    */*)
-      if ! git -C "$deployment_repository_dir" fetch --quiet origin; then
-        echo "Cannot fetch from origin. An unattended update needs a read-only" >&2
+  # Only a remote-tracking reference is worth fetching, and it says by itself
+  # which remote to fetch from. A local reference, a tag or the reference of
+  # another checkout is read as it is.
+  source_full_ref=$(git -C "$deployment_repository_dir" \
+    rev-parse --symbolic-full-name "$source_ref" 2>/dev/null || true)
+  case "$source_full_ref" in
+    refs/remotes/*)
+      source_remote=${source_full_ref#refs/remotes/}
+      source_remote=${source_remote%%/*}
+      if ! git -C "$deployment_repository_dir" fetch --quiet "$source_remote"; then
+        echo "Cannot fetch from $source_remote. An unattended update needs a read-only" >&2
         echo "deploy key on this host, because no SSH agent is forwarded to it." >&2
         exit 1
       fi
@@ -235,8 +243,12 @@ if [ "$update_mode" = manual ] && [ "$assume_yes" = 0 ]; then
   exit 10
 fi
 
-if [ "$deployment_drift" = yes ] && [ "$allow_stale" = 0 ] && [ "$update_mode" = auto ]; then
-  echo "Refusing to update unattended from a checkout that differs from $source_ref." >&2
+if [ "$deployment_drift" = yes ] && [ "$allow_stale" = 0 ]; then
+  echo "Refusing to update from a checkout that differs from $source_ref in the" >&2
+  echo "files that end up in the image. The image built here would be tagged with" >&2
+  echo "the revisions it declares while containing something else, and that image" >&2
+  echo "outlives this update: it is what a rollback starts again and what every" >&2
+  echo "backup manifest records." >&2
   echo "Update the checkout, or pass --allow-stale-deployment deliberately." >&2
   exit 3
 fi

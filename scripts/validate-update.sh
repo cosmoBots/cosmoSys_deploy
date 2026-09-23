@@ -30,6 +30,7 @@ export COSMOSYS_INSTANCES_DIR="$validation_directory/instances"
 export COSMOSYS_ENV_FILE="$COSMOSYS_INSTANCES_DIR/instance.env"
 export COSMOSYS_BACKUP_ROOT="$validation_directory/backups"
 instance_lock="${TMPDIR:-/tmp}/cosmosys-update-csys_update_validation_$suffix.lock"
+stale_ref=
 
 # The release the instance starts from. The target is whatever this checkout
 # declares, so the validation follows the repository instead of a fixed pair.
@@ -62,6 +63,9 @@ cleanup() {
   fi
   deployment_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -rf -- "$instance_lock"
+  if [ -n "$stale_ref" ]; then
+    git -C "$deployment_repository_dir" update-ref -d "$stale_ref" 2>/dev/null || true
+  fi
   docker image rm -f "$baseline_image" "$baseline_req_image" \
     "$target_image" "$target_req_image" \
     "cosmobots/cosmosys-update-validation:broken-$suffix" \
@@ -211,6 +215,46 @@ if git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
     echo "--source HEAD changed the running instance" >&2
     exit 1
   fi
+
+  # A reference whose Dockerfile differs from this working tree, built with
+  # plumbing so that no file, no index and no branch of the checkout is
+  # touched. Only the reference is created, and it is removed right after.
+  echo "Checking that a checkout differing from the reference is refused..."
+  stale_ref="refs/validation/stale-$suffix"
+  stale_blob=$(printf 'FROM scratch\n' |
+    git -C "$deployment_repository_dir" hash-object -w --stdin)
+  GIT_INDEX_FILE="$validation_directory/stale-index" \
+    git -C "$deployment_repository_dir" read-tree HEAD
+  GIT_INDEX_FILE="$validation_directory/stale-index" \
+    git -C "$deployment_repository_dir" update-index --add \
+    --cacheinfo "100644,$stale_blob,Dockerfile"
+  stale_tree=$(GIT_INDEX_FILE="$validation_directory/stale-index" \
+    git -C "$deployment_repository_dir" write-tree)
+  stale_commit=$(GIT_AUTHOR_NAME=validation GIT_AUTHOR_EMAIL=validation@example.org \
+    GIT_COMMITTER_NAME=validation GIT_COMMITTER_EMAIL=validation@example.org \
+    git -C "$deployment_repository_dir" commit-tree "$stale_tree" -p HEAD \
+    -m "deployment that differs from this working tree")
+  git -C "$deployment_repository_dir" update-ref "$stale_ref" "$stale_commit"
+
+  update_status=0
+  update --yes --source "$stale_ref" >"$validation_directory/stale.log" 2>&1 ||
+    update_status=$?
+  if [ "$update_status" -ne 3 ]; then
+    echo "A stale checkout returned $update_status instead of 3" >&2
+    cat "$validation_directory/stale.log" >&2
+    exit 1
+  fi
+  if [ "$(running_revision)" != "$baseline_revision" ]; then
+    echo "A stale checkout was updated anyway" >&2
+    exit 1
+  fi
+  if [ "$(instance_setting COSMOSYS_REVISION)" != "$baseline_revision" ]; then
+    echo "A stale checkout had the instance environment file changed" >&2
+    exit 1
+  fi
+
+  git -C "$deployment_repository_dir" update-ref -d "$stale_ref"
+  stale_ref=
 else
   echo "Skipping the git reference check: this is not a git checkout."
 fi

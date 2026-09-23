@@ -21,7 +21,7 @@ flowchart TD
     D -->|no| E{"Applying,<br>or only reporting?"}
     E -->|reporting only| AVAILABLE(["exit 10<br>update available"])
     E -->|applying| F{"Safe to apply?"}
-    F -->|unattended from a stale checkout| REFUSED
+    F -->|stale checkout| REFUSED
     F -->|PostgreSQL major version change| REFUSED
     F -->|yes| G{"Is another update<br>of this instance running?"}
     G -->|yes| LOCKED(["exit 4<br>already running"])
@@ -110,11 +110,13 @@ The script says so and asks for `COSMOSYS_VARIANT=requirements` in that file.
 another major version is a migration with its own dump and restore, not an
 update.
 
-**An unattended update from a stale checkout.** If the files that end up inside
-the image differ from the declared reference, building here would put something
-else under the image tag that names those revisions. With `--yes`, that is to
-say with somebody watching, it warns and continues; unattended it stops, and
-`--allow-stale-deployment` says it deliberately.
+**An update from a stale checkout.** If the files that end up inside the image
+differ from the declared reference, the image built here would be tagged with
+the revisions it declares while containing something else, and that image
+outlives the update: it is what a rollback starts again and what every backup
+manifest records. Somebody watching the terminal does not make it true, so the
+refusal does not depend on who is running the update. `--allow-stale-deployment`
+says it deliberately.
 
 ## The point of no return
 
