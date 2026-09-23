@@ -216,6 +216,16 @@ sudo cp systemd/cosmosys-update.conf.example /etc/default/cosmosys-update
 sudo systemctl enable --now cosmosys-update@alpha.timer
 ```
 
+A host with several instances is reported, or updated, in one command.
+`scripts/update-instances.sh` runs the same script over every `<name>.env` file
+of `COSMOSYS_INSTANCES_DIR`, one after another, passes its options through, ends
+with one line per instance and exits with the most serious status of the host:
+
+```sh
+COSMOSYS_INSTANCES_DIR=/srv/cosmosys/instances \
+  ./scripts/update-instances.sh --check
+```
+
 Each instance is locked while it is updated, so a scheduled update and a manual
 one never recreate the same instance at once; the second one stops with status
 4. Instances on one host still update in parallel with each other.
@@ -224,11 +234,14 @@ When an update fails, the script puts the previous revisions back in the
 environment file and starts the previous image, which is still on the host.
 That undoes the code but not the schema: if the migration had already run, the
 way back is the backup the update took, and the script prints the `restore.sh`
-command for it. For the same reason it refuses to run when the PostgreSQL major
-version would change, which needs its own dump and restore, and it refuses to
-update an auto instance from a checkout whose image-building files differ from
-`origin/main`, because the image tag would then name revisions without
-describing what is inside it.
+command for it. For the same reason it refuses three situations rather than
+attempting them: an environment file that contradicts the running image, such
+as an instance provisioned before the variant was recorded, which would be
+rebuilt as the base variant and lose its requirements plugin; a PostgreSQL
+major version change, which needs its own dump and restore; and an unattended
+update from a checkout whose image-building files differ from `origin/main`,
+because the image tag would then name revisions without describing what is
+inside it.
 
 Validate the whole path, a successful update and a failed one, on a disposable
 instance:

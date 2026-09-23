@@ -13,13 +13,15 @@ The command itself, its options and how to schedule it are in the README.
 ```mermaid
 flowchart TD
     A["Read the instance:<br>variant, modes, running container"] --> B["Read what runs:<br>container labels and image reference"]
-    B --> C["Read what is declared:<br>git fetch and git show, or a pins file"]
+    B --> B2{"Does the environment file<br>contradict the running image?"}
+    B2 -->|yes| REFUSED(["exit 3<br>refused"])
+    B2 -->|no| C["Read what is declared:<br>git fetch and git show, or a pins file"]
     C --> D{"Is the declared image<br>the one running?"}
     D -->|yes| UPTODATE(["exit 0<br>up to date"])
     D -->|no| E{"Applying,<br>or only reporting?"}
     E -->|reporting only| AVAILABLE(["exit 10<br>update available"])
     E -->|applying| F{"Safe to apply?"}
-    F -->|unattended from a stale checkout| REFUSED(["exit 3<br>refused"])
+    F -->|unattended from a stale checkout| REFUSED
     F -->|PostgreSQL major version change| REFUSED
     F -->|yes| G{"Is another update<br>of this instance running?"}
     G -->|yes| LOCKED(["exit 4<br>already running"])
@@ -50,7 +52,8 @@ can only be undone from a backup.
    without doing anything.
 2. **Read what runs.** The revisions come from the labels of the running
    container and not from any configuration file, because an environment file
-   can already name a version that has not been built or activated yet.
+   can already name a version that has not been built or activated yet. If
+   those labels contradict the environment file, the script stops here.
 3. **Read what is declared.** `git fetch` followed by `git show REF:<file>`, or
    a pins file when one is given. The fetch only moves remote-tracking refs: no
    file of the checkout, no branch and no submodule pointer is modified.
@@ -92,6 +95,26 @@ can only be undone from a backup.
 Named volumes survive a recreation. The script never runs `down`, never passes
 `--volumes`, never removes an image and never prunes anything, so the previous
 image is still on the host after an update and is what a rollback starts again.
+
+## What it refuses to do
+
+Three situations stop the script with status 3 instead of being attempted.
+
+**An environment file that contradicts the running image.** An instance
+provisioned before the variant was recorded runs the Requirements image while
+its file says nothing, so it resolves to the base variant. Updating it would
+rebuild it as the base variant and take the requirements plugin away from it.
+The script says so and asks for `COSMOSYS_VARIANT=requirements` in that file.
+
+**A major PostgreSQL version change.** Recreating the database container on
+another major version is a migration with its own dump and restore, not an
+update.
+
+**An unattended update from a stale checkout.** If the files that end up inside
+the image differ from the declared reference, building here would put something
+else under the image tag that names those revisions. With `--yes`, that is to
+say with somebody watching, it warns and continues; unattended it stops, and
+`--allow-stale-deployment` says it deliberately.
 
 ## The point of no return
 
@@ -148,6 +171,44 @@ migration had already run, the way back is the backup that the same update took
 in step 6, and the script prints the exact `restore.sh` command for it. The
 copy of the environment file it made in step 7 is kept as well, and the script
 prints where.
+
+## Several instances on one host
+
+An instance is the unit of work: `update-instance.sh` takes one environment
+file and knows nothing about the others. `update-instances.sh` runs it over
+every `<name>.env` file of a directory, passing its options through unchanged,
+so each instance still decides for itself whether it updates unattended.
+
+```mermaid
+flowchart TD
+    A["Next instance environment file,<br>in name order"] --> B["update-instance.sh<br>(see The sequence above)"]
+    B -->|"updated, up to date, available,<br>already running or refused"| C{"Any instance left?"}
+    C -->|yes| A
+    C -->|no| D["One line per instance,<br>exit with the most serious status"]
+    B -->|"the update failed"| E["Stop:<br>the instances left are not attempted"]
+    E --> D
+```
+
+They run one after another, never at once. Two builds at the same time fight
+for the processor and for the build cache, whereas in sequence an instance that
+declares the same versions as the previous one reuses the image that was just
+built, in seconds. It also means two instances are never out of service at the
+same time.
+
+A failed update stops the run. The version that broke one instance is unlikely
+to be good for the next one, so the instances left are reported as not
+attempted rather than updated. Everything else continues: an instance that is
+up to date, that only reports, that is locked or that is refused has changed
+nothing, and the next instance is unaffected.
+
+The exit status is the most serious one of the host, in this order: an update
+failed, a usage or configuration error, a refusal, an update already running,
+an update available, nothing to report.
+
+The directory is the one the units use, so it holds one environment file per
+instance and nothing else. For scheduled updates there is no need for this
+script: one timer per instance does the same thing, spread over the hour by
+`RandomizedDelaySec`.
 
 ## One update at a time
 

@@ -104,9 +104,17 @@ fi
 running_image=$(docker inspect --format '{{.Config.Image}}' "$redmine_container")
 running_cosmosys=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys.revision)
 running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmobots.rspreadsheet.revision)
-running_cosmosys_req=
-if [ "$variant" = requirements ]; then
-  running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
+running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
+
+# An instance provisioned before the variant was recorded runs the Requirements
+# image while its environment file says nothing, so it resolves to the base
+# variant. Updating it then would rebuild it as the base variant and take the
+# requirements plugin away from it.
+if [ "$variant" = base ] && [ "$running_cosmosys_req" != unknown ]; then
+  echo "This instance runs cosmoSys Requirements $running_cosmosys_req, but its" >&2
+  echo "environment file does not say so and it resolves to the base variant." >&2
+  echo "Add COSMOSYS_VARIANT=requirements to $instance_env before updating it." >&2
+  exit 3
 fi
 
 # Prints one KEY=VALUE setting out of the text on standard input.

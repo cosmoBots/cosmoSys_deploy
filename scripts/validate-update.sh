@@ -23,7 +23,11 @@ baseline_req_image="cosmobots/cosmosys-req-update-validation:baseline-$suffix"
 target_image="cosmobots/cosmosys-update-validation:target-$suffix"
 target_req_image="cosmobots/cosmosys-req-update-validation:target-$suffix"
 
-export COSMOSYS_ENV_FILE="$validation_directory/instance.env"
+# The instance file lives in a directory of its own, which is both the layout
+# the units expect and what lets update-instances.sh be validated here.
+mkdir "$validation_directory/instances"
+export COSMOSYS_INSTANCES_DIR="$validation_directory/instances"
+export COSMOSYS_ENV_FILE="$COSMOSYS_INSTANCES_DIR/instance.env"
 export COSMOSYS_BACKUP_ROOT="$validation_directory/backups"
 instance_lock="${TMPDIR:-/tmp}/cosmosys-update-csys_update_validation_$suffix.lock"
 
@@ -125,15 +129,15 @@ instance_setting() {
   sed -n "s/^$1=//p" "$COSMOSYS_ENV_FILE" | tail -n 1
 }
 
-set_update_mode() {
-  awk -v value="$1" '
-    index($0, "COSMOSYS_UPDATE_MODE=") == 1 {
-      print "COSMOSYS_UPDATE_MODE=" value
+set_instance_value() {
+  awk -v key="$1" -v value="$2" '
+    index($0, key "=") == 1 {
+      print key "=" value
       next
     }
     { print }
-  ' "$COSMOSYS_ENV_FILE" >"$validation_directory/mode.env"
-  cat "$validation_directory/mode.env" >"$COSMOSYS_ENV_FILE"
+  ' "$COSMOSYS_ENV_FILE" >"$validation_directory/setting.env"
+  cat "$validation_directory/setting.env" >"$COSMOSYS_ENV_FILE"
 }
 
 echo "Starting the baseline instance on cosmoSys $baseline_revision..."
@@ -171,6 +175,57 @@ if [ "$(instance_setting COSMOSYS_REVISION)" != "$baseline_revision" ]; then
   exit 1
 fi
 
+echo "Checking that the whole host is reported in one command..."
+update_status=0
+"$deployment_repository_dir/scripts/update-instances.sh" --check \
+  --pins "$validation_directory/target.env" >"$validation_directory/host.log" 2>&1 ||
+  update_status=$?
+if [ "$update_status" -ne 10 ]; then
+  echo "update-instances.sh returned $update_status instead of 10" >&2
+  cat "$validation_directory/host.log" >&2
+  exit 1
+fi
+if ! grep -q "^instance  *update available, not applied$" "$validation_directory/host.log"; then
+  echo "update-instances.sh did not report the instance in its summary" >&2
+  cat "$validation_directory/host.log" >&2
+  exit 1
+fi
+
+# The rest of the validation pins the declared versions to a file, so this is
+# what covers reading them out of git, which is what a real update does.
+if git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "Checking that the declared versions can be read from a git reference..."
+  update_status=0
+  update --check --source HEAD >"$validation_directory/git.log" 2>&1 || update_status=$?
+  if [ "$update_status" -ne 10 ]; then
+    echo "--source HEAD returned $update_status instead of 10" >&2
+    cat "$validation_directory/git.log" >&2
+    exit 1
+  fi
+  if ! grep -q "^Declared: cosmobots/cosmosys-req:" "$validation_directory/git.log"; then
+    echo "--source HEAD did not read the image name declared by the checkout" >&2
+    cat "$validation_directory/git.log" >&2
+    exit 1
+  fi
+  if [ "$(running_revision)" != "$baseline_revision" ]; then
+    echo "--source HEAD changed the running instance" >&2
+    exit 1
+  fi
+else
+  echo "Skipping the git reference check: this is not a git checkout."
+fi
+
+echo "Checking that a file contradicting the running image is refused..."
+set_instance_value COSMOSYS_VARIANT base
+update_status=0
+update --check --pins "$validation_directory/target.env" >/dev/null 2>&1 ||
+  update_status=$?
+set_instance_value COSMOSYS_VARIANT requirements
+if [ "$update_status" -ne 3 ]; then
+  echo "An instance declaring the wrong variant returned $update_status instead of 3" >&2
+  exit 1
+fi
+
 echo "Checking that a manual instance is not updated without --yes..."
 update_status=0
 update --pins "$validation_directory/target.env" || update_status=$?
@@ -184,7 +239,7 @@ if [ "$(running_revision)" != "$baseline_revision" ]; then
 fi
 
 # An instance set to auto updates unattended, which is what the timer relies on.
-set_update_mode auto
+set_instance_value COSMOSYS_UPDATE_MODE auto
 
 echo "Checking that an instance already being updated is left alone..."
 mkdir "$instance_lock"
