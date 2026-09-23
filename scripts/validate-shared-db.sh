@@ -27,12 +27,13 @@ shared_compose() {
     -f "$deployment_repository_dir/shared-db/compose.yml" "$@"
 }
 
+# The environment file of each instance names its variant, so no caller here
+# has to remember which one it is.
 instance_compose() {
   (
     COSMOSYS_ENV_FILE=$1
-    COSMOSYS_VARIANT=$2
-    export COSMOSYS_ENV_FILE COSMOSYS_VARIANT
-    shift 2
+    export COSMOSYS_ENV_FILE
+    shift
     deployment_compose "$@"
   )
 }
@@ -41,7 +42,7 @@ cleanup() {
   cleanup_failed=0
   for instance_env in "$env_a" "$env_b"; do
     if [ -f "$instance_env" ]; then
-      instance_compose "$instance_env" base down --volumes --remove-orphans >/dev/null 2>&1 ||
+      instance_compose "$instance_env" down --volumes --remove-orphans >/dev/null 2>&1 ||
         cleanup_failed=1
     fi
   done
@@ -65,8 +66,8 @@ EOF
 
 # Only one Redmine runs at a time, so the validation fits on small hosts.
 start_instance() {
-  if ! instance_compose "$1" "$2" up -d --wait --build redmine; then
-    instance_compose "$1" "$2" logs --no-color --tail 100 migrate bootstrap redmine >&2 || true
+  if ! instance_compose "$1" up -d --wait --build redmine; then
+    instance_compose "$1" logs --no-color --tail 100 migrate bootstrap redmine >&2 || true
     return 1
   fi
 }
@@ -76,22 +77,34 @@ shared_compose up -d --wait postgres
 
 provision="$deployment_repository_dir/scripts/provision-instance.sh"
 "$provision" "$instance_a" "$env_a" >/dev/null
-"$provision" "$instance_b" "$env_b" >/dev/null
+"$provision" --variant requirements "$instance_b" "$env_b" >/dev/null
 if "$provision" "$instance_a" "$validation_directory/again.env" >/dev/null 2>&1; then
   echo "Provisioning accepted an instance that already exists" >&2
   exit 1
 fi
 test ! -e "$validation_directory/again.env"
 
-start_instance "$env_a" base
-instance_compose "$env_a" base exec -T redmine bundle exec rails runner \
-  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort('cosmosys missing') unless actual.include?('cosmosys'); abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req'); abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
-instance_compose "$env_a" base stop redmine >/dev/null
+# The variant belongs to the environment file; a shell that contradicts it is
+# a mistake rather than a silent override.
+if (
+  COSMOSYS_ENV_FILE="$env_b"
+  COSMOSYS_VARIANT=base
+  export COSMOSYS_ENV_FILE COSMOSYS_VARIANT
+  deployment_compose config --quiet
+) >/dev/null 2>&1; then
+  echo "A COSMOSYS_VARIANT contradicting the environment file was accepted" >&2
+  exit 1
+fi
 
-start_instance "$env_b" requirements
-instance_compose "$env_b" requirements exec -T redmine bundle exec rails runner \
+start_instance "$env_a"
+instance_compose "$env_a" exec -T redmine bundle exec rails runner \
+  "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort('cosmosys missing') unless actual.include?('cosmosys'); abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req'); abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
+instance_compose "$env_a" stop redmine >/dev/null
+
+start_instance "$env_b"
+instance_compose "$env_b" exec -T redmine bundle exec rails runner \
   "actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = %w[cosmosys cosmosys_req] - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('missing help projects') unless Project.where(identifier: %w[csys_help csys_admin_help]).count == 2"
-instance_compose "$env_b" requirements stop redmine >/dev/null
+instance_compose "$env_b" stop redmine >/dev/null
 
 for project in "csys_$instance_a" "csys_$instance_b"; do
   if [ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project" \
@@ -105,7 +118,7 @@ privileged=$(shared_compose exec -T postgres psql -U postgres -d postgres -tAc \
   "SELECT count(*) FROM pg_roles WHERE rolname IN ('csys_$instance_a', 'csys_$instance_b') AND (rolsuper OR rolcreatedb)")
 test "$privileged" = 0
 
-isolation_output=$(instance_compose "$env_a" base run --rm --no-deps -T db-client \
+isolation_output=$(instance_compose "$env_a" run --rm --no-deps -T db-client \
   psql --dbname "csys_$instance_b" --command 'SELECT 1' 2>&1 || true)
 case "$isolation_output" in
   *"CONNECT privilege"*) ;;
@@ -116,17 +129,17 @@ case "$isolation_output" in
 esac
 
 db_a() {
-  instance_compose "$env_a" base run --rm --no-deps -T db-client \
+  instance_compose "$env_a" run --rm --no-deps -T db-client \
     psql --tuples-only --no-align --set ON_ERROR_STOP=1 "$@"
 }
 
-start_instance "$env_a" base
+start_instance "$env_a"
 db_a --command "CREATE TABLE csys_restore_probe (value text NOT NULL); INSERT INTO csys_restore_probe VALUES ('database-before-backup');" \
   >/dev/null
-instance_compose "$env_a" base exec -T redmine sh -c \
+instance_compose "$env_a" exec -T redmine sh -c \
   "printf '%s' 'files-before-backup' > /usr/src/redmine/files/csys-restore-probe.txt"
 
-backup_directory=$(COSMOSYS_ENV_FILE="$env_a" COSMOSYS_VARIANT=base \
+backup_directory=$(COSMOSYS_ENV_FILE="$env_a" \
   "$deployment_repository_dir/scripts/backup.sh" "$validation_directory/backups")
 
 for manifest_line in \
@@ -141,20 +154,20 @@ for manifest_line in \
 done
 
 db_a --command "UPDATE csys_restore_probe SET value = 'database-after-backup';" >/dev/null
-instance_compose "$env_a" base exec -T redmine sh -c \
+instance_compose "$env_a" exec -T redmine sh -c \
   "printf '%s' 'files-after-backup' > /usr/src/redmine/files/csys-restore-probe.txt"
 
-COSMOSYS_ENV_FILE="$env_a" COSMOSYS_VARIANT=base \
+COSMOSYS_ENV_FILE="$env_a" \
   RESTORE_CONFIRMATION=ERASE_EXISTING_COSMOSYS_DATA \
   "$deployment_repository_dir/scripts/restore.sh" "$backup_directory" >/dev/null
 
 database_value=$(db_a --command 'SELECT value FROM csys_restore_probe')
-file_value=$(instance_compose "$env_a" base exec -T redmine \
+file_value=$(instance_compose "$env_a" exec -T redmine \
   cat /usr/src/redmine/files/csys-restore-probe.txt)
 test "$database_value" = database-before-backup
 test "$file_value" = files-before-backup
 
-b_state=$(instance_compose "$env_b" requirements run --rm --no-deps -T db-client \
+b_state=$(instance_compose "$env_b" run --rm --no-deps -T db-client \
   psql --tuples-only --no-align --command \
   "SELECT (SELECT count(*) FROM pg_tables WHERE tablename = 'csys_restore_probe') || ',' || (SELECT count(*) FROM projects WHERE identifier = 'csys_help')")
 test "$b_state" = "0,1"

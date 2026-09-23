@@ -70,8 +70,11 @@ pass to Compose. A relative path resolves from the current directory, and a
 COSMOSYS_ENV_FILE=/srv/cosmosys/instance.env ./scripts/backup.sh
 ```
 
-For the Requirements composition, set `COSMOSYS_VARIANT=requirements` for both
-backup and restore. Restore is intentionally explicit and destructive:
+An instance records its variant in `COSMOSYS_VARIANT`, which
+`provision-instance.sh` writes into that file, so backup and restore need no
+further argument to reach a Requirements instance. A shell variable that
+contradicts the file is an error rather than a silent override. Restore is
+intentionally explicit and destructive:
 
 ```sh
 RESTORE_CONFIRMATION=ERASE_EXISTING_COSMOSYS_DATA \
@@ -101,6 +104,14 @@ docker compose -f compose.yml up -d
 ```sh
 docker compose -f compose.yml -f compose.requirements.yml build
 docker compose -f compose.yml -f compose.requirements.yml up -d
+```
+
+An instance with its own environment file names its variant there, so
+`scripts/compose.sh` resolves the files it needs and every Compose command
+reads the same for both variants:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh up -d
 ```
 
 The web service binds to `127.0.0.1:3000` by default. Put a TLS reverse proxy
@@ -194,19 +205,22 @@ password, and refuses to reuse an existing file, role or database.
 ./scripts/provision-instance.sh --http-port 3101 alpha /srv/cosmosys/alpha.env
 ```
 
-The generated file sets `COSMOSYS_DB_MODE=shared`, so the deployment scripts
-add `compose.shared-db.yml` by themselves when they receive it through
-`COSMOSYS_ENV_FILE`. Direct Compose commands must name the overlay:
+The generated file sets `COSMOSYS_VARIANT` and `COSMOSYS_DB_MODE=shared`, so
+the deployment scripts add the overlays that instance needs when they receive
+it through `COSMOSYS_ENV_FILE`, and `scripts/compose.sh` does the same for any
+Compose command. Direct `docker compose` invocations must name the overlays:
 
 ```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh up -d
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/backup.sh
 docker compose --env-file /srv/cosmosys/alpha.env \
   -f compose.yml -f compose.shared-db.yml up -d
-COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/backup.sh
 ```
 
-For the Requirements variant, add `compose.requirements.yml` to direct commands
-and `COSMOSYS_VARIANT=requirements` to the scripts. Give every instance a
-distinct `COSMOSYS_HTTP_PORT`, or `0` for a random local port.
+Provision a Requirements instance with `--variant requirements`, which records
+it in the environment file; only direct Compose commands then have to name
+`compose.requirements.yml`. Give every instance a distinct
+`COSMOSYS_HTTP_PORT`, or `0` for a random local port.
 
 In shared mode, backups and restores run the PostgreSQL tools in a disposable
 `db-client` container with the instance credentials. A restore removes the
@@ -293,13 +307,14 @@ timer. For example, from this repository, a daily cron entry can invoke:
 ```
 
 Create and rotate the host-side log directory according to the installation's
-operations policy. For the Requirements composition, give the scheduled
-process the same `COSMOSYS_VARIANT=requirements` and optional
-`COSMOSYS_COMPOSE_PROJECT` environment used by the deployment.
+operations policy. Give the scheduled process the optional
+`COSMOSYS_COMPOSE_PROJECT` used by the deployment.
 
 When the deployment is configured through its own environment file rather than
 `.env`, also give the scheduled process `COSMOSYS_ENV_FILE` pointing at that
-file.
+file; the variant comes from that file. A deployment that runs the Requirements
+composition from `.env` gives the process `COSMOSYS_VARIANT=requirements`
+instead.
 
 - Copyright and authorship: cosmoBots.eu
 - Contact: txinto@elporis.com
