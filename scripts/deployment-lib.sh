@@ -69,6 +69,19 @@ deployment_variant() {
   esac
 }
 
+# Prints a label of a container, or "unknown" when the image predates it.
+deployment_container_label() {
+  label_value=$(docker inspect --format "{{index .Config.Labels \"$2\"}}" "$1")
+  case "$label_value" in
+    ''|'<no value>')
+      printf 'unknown\n'
+      ;;
+    *)
+      printf '%s\n' "$label_value"
+      ;;
+  esac
+}
+
 deployment_compose() {
   db_mode=$(deployment_db_mode) || return
   proxy_mode=$(deployment_proxy_mode) || return
