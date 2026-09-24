@@ -18,21 +18,13 @@ fi
 
 # Describe the running container rather than the configuration: an
 # environment file may already name revisions that are not active yet.
-container_label() {
-  label_value=$(docker inspect --format "{{index .Config.Labels \"$1\"}}" "$redmine_container")
-  case "$label_value" in
-    ''|'<no value>') echo unknown ;;
-    *) echo "$label_value" ;;
-  esac
-}
-
-compose_project=$(container_label com.docker.compose.project)
+compose_project=$(deployment_container_label "$redmine_container" com.docker.compose.project)
 redmine_image=$(docker inspect --format '{{.Image}}' "$redmine_container")
-cosmosys_revision=$(container_label eu.cosmobots.cosmosys.revision)
-rspreadsheet_revision=$(container_label eu.cosmobots.rspreadsheet.revision)
+cosmosys_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys.revision)
+rspreadsheet_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.rspreadsheet.revision)
 cosmosys_req_revision=
 if [ "$variant" = requirements ]; then
-  cosmosys_req_revision=$(container_label eu.cosmobots.cosmosys-req.revision)
+  cosmosys_req_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 fi
 
 if [ "$cosmosys_revision" = unknown ]; then

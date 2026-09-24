@@ -1,0 +1,20 @@
+[Unit]
+Description=cosmoSys update check for instance %i
+Documentation=https://github.com/cosmoBots/cosmoSys_deploy
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/cosmosys-update
+ExecStart=/bin/sh -c 'COSMOSYS_ENV_FILE="$COSMOSYS_INSTANCES_DIR/%i.env" exec "$COSMOSYS_DEPLOY_DIR/scripts/update-instance.sh"'
+
+# An instance set to manual reports an available update with status 10 and
+# changes nothing. That is its normal state, not a failure of the unit.
+SuccessExitStatus=10
+
+# Run as the account that owns the checkout, the instance environment files and
+# the backups, and that can reach the Docker socket.
+#User=cosmosys
+#Group=docker

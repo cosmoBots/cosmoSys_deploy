@@ -176,6 +176,83 @@ idempotently; ordinary facade pages are created once and then belong to the
 administrator. Run `scripts/bootstrap-content.sh` to reapply the current
 package explicitly.
 
+## Updating an instance
+
+The version of an instance is the image it runs, and that image tag names the
+plugin revisions built into it. `scripts/update-instance.sh` compares it with
+the version this repository declares and moves the instance to it:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/update-instance.sh --check
+```
+
+`--check` changes nothing and exits 0 when the instance is up to date and 10
+when an update is available. Without it the script applies the update: it backs
+the instance up, writes the new revisions into the instance environment file,
+builds the image, recreates the instance, waits for it to become healthy and
+verifies that the new container carries the revisions that were asked for and
+registers the expected plugins.
+
+The declared version is read from `origin/main` with `git fetch` and
+`git show`, never from the working tree, so the script works the same on a
+plain clone and on a submodule with a detached HEAD, and it never modifies the
+checkout. `--source REF` reads another reference, and `--pins FILE` takes the
+revisions from a file, which is how one instance is held at an older
+combination.
+
+Because those revisions end up in the instance environment file, every instance
+carries its own version: two instances sharing a checkout can run different
+combinations, and updating the checkout does not move either of them.
+
+Set `COSMOSYS_UPDATE_MODE` in the instance environment file to `manual` (the
+default) or `auto`. A manual instance reports an available update and exits 10
+without touching anything unless `--yes` is passed; an auto instance applies it
+unattended. `systemd/` holds a template service and timer to instantiate once
+per instance, and an example of the paths they read:
+
+```sh
+sudo cp systemd/cosmosys-update@.* /etc/systemd/system/
+sudo cp systemd/cosmosys-update.conf.example /etc/default/cosmosys-update
+sudo systemctl enable --now cosmosys-update@alpha.timer
+```
+
+A host with several instances is reported, or updated, in one command.
+`scripts/update-instances.sh` runs the same script over every `<name>.env` file
+of `COSMOSYS_INSTANCES_DIR`, one after another, passes its options through, ends
+with one line per instance and exits with the most serious status of the host:
+
+```sh
+COSMOSYS_INSTANCES_DIR=/srv/cosmosys/instances \
+  ./scripts/update-instances.sh --check
+```
+
+Each instance is locked while it is updated, so a scheduled update and a manual
+one never recreate the same instance at once; the second one stops with status
+4. Instances on one host still update in parallel with each other.
+
+When an update fails, the script puts the previous revisions back in the
+environment file and starts the previous image, which is still on the host.
+That undoes the code but not the schema: if the migration had already run, the
+way back is the backup the update took, and the script prints the `restore.sh`
+command for it. For the same reason it refuses three situations rather than
+attempting them: an environment file that contradicts the running image, such
+as an instance provisioned before the variant was recorded, which would be
+rebuilt as the base variant and lose its requirements plugin; a PostgreSQL
+major version change, which needs its own dump and restore; and an update from a
+checkout whose image-building files differ from `origin/main`, because the
+image tag would then name revisions without describing what is inside it.
+
+Validate the whole path, a successful update and a failed one, on a disposable
+instance:
+
+```sh
+./scripts/validate-update.sh
+```
+
+[`docs/instance-updates.md`](docs/instance-updates.md) describes the sequence
+step by step, with a diagram, what each step touches, where the point of no
+return is and what a failure can cost.
+
 ## Shared PostgreSQL server
 
 Several instances on one host can share a single PostgreSQL server instead of

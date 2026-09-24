@@ -1,0 +1,16 @@
+# Copy to /etc/default/cosmosys-update and adjust to this host.
+# Read by cosmosys-update@.service, one instantiation per instance.
+
+# Checkout of this deployment.
+COSMOSYS_DEPLOY_DIR=/srv/cosmosys/deploy
+
+# Directory holding one <instance>.env file per instance, so that the unit
+# instantiated as cosmosys-update@alpha reaches /srv/cosmosys/instances/alpha.env.
+COSMOSYS_INSTANCES_DIR=/srv/cosmosys/instances
+
+# Where the backup taken before each update is written. Keep it outside the
+# checkout, and copy it off the host according to the retention policy.
+COSMOSYS_BACKUP_ROOT=/srv/cosmosys/backups
+
+# How long an instance may take to become healthy after being recreated.
+COSMOSYS_UPDATE_TIMEOUT=300
