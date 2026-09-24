@@ -54,9 +54,25 @@ deployment_proxy_mode() {
   esac
 }
 
+# Prints "base" or "requirements" (the variant that adds cosmoSys Requirements).
+deployment_variant() {
+  variant_value=$(deployment_setting COSMOSYS_VARIANT base) || return
+
+  case "$variant_value" in
+    base|requirements)
+      printf '%s\n' "$variant_value"
+      ;;
+    *)
+      echo "COSMOSYS_VARIANT must be base or requirements" >&2
+      return 2
+      ;;
+  esac
+}
+
 deployment_compose() {
   db_mode=$(deployment_db_mode) || return
   proxy_mode=$(deployment_proxy_mode) || return
+  variant=$(deployment_variant) || return
 
   if [ -n "${COSMOSYS_COMPOSE_PROJECT:-}" ]; then
     set -- -p "$COSMOSYS_COMPOSE_PROJECT" "$@"
@@ -78,17 +94,9 @@ deployment_compose() {
     set -- -f "$deployment_repository_dir/compose.shared-db.yml" "$@"
   fi
 
-  case "${COSMOSYS_VARIANT:-base}" in
-    base)
-      ;;
-    requirements)
-      set -- -f "$deployment_repository_dir/compose.requirements.yml" "$@"
-      ;;
-    *)
-      echo "COSMOSYS_VARIANT must be base or requirements" >&2
-      return 2
-      ;;
-  esac
+  if [ "$variant" = requirements ]; then
+    set -- -f "$deployment_repository_dir/compose.requirements.yml" "$@"
+  fi
 
   docker compose -f "$deployment_repository_dir/compose.yml" "$@"
 }

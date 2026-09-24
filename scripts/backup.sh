@@ -7,7 +7,7 @@ backup_root=${1:-"$deployment_repository_dir/backups"}
 timestamp=$(date -u +%Y%m%dT%H%M%SZ)
 final_directory="$backup_root/$timestamp"
 temporary_directory="$backup_root/.${timestamp}.$$"
-variant=${COSMOSYS_VARIANT:-base}
+variant=$(deployment_variant)
 database_mode=$(deployment_db_mode)
 
 redmine_container=$(deployment_compose ps -q redmine)

@@ -80,7 +80,9 @@ services:
     volumes:
       - files:/usr/src/redmine/files
     healthcheck:
-      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
+      # The login page answers 200 whether or not the instance requires
+      # authentication, while / redirects to it as soon as it does.
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://127.0.0.1:3000/login')).is_a?(Net::HTTPSuccess) ? 0 : 1)"]
       interval: 15s
       timeout: 5s
       retries: 20
