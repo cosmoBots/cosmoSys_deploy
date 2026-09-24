@@ -16,6 +16,7 @@ flowchart TD
     B --> B2{"Does the environment file<br>contradict the running image?"}
     B2 -->|yes| REFUSED(["exit 3<br>refused"])
     B2 -->|no| C["Read what is declared:<br>git fetch and git show, or a pins file"]
+    C -->|"remote unreachable"| CONFIG(["exit 2<br>configuration error"])
     C --> D{"Is the declared image<br>the one running?"}
     D -->|yes| UPTODATE(["exit 0<br>up to date"])
     D -->|no| E{"Applying,<br>or only reporting?"}
@@ -56,7 +57,9 @@ can only be undone from a backup.
    those labels contradict the environment file, the script stops here.
 3. **Read what is declared.** `git fetch` followed by `git show REF:<file>`, or
    a pins file when one is given. The fetch only moves remote-tracking refs: no
-   file of the checkout, no branch and no submodule pointer is modified.
+   file of the checkout, no branch and no submodule pointer is modified. A
+   remote that cannot be reached stops the script as a configuration error,
+   with nothing touched, because it says nothing about the version itself.
 4. **Compare and decide.** Identical image references mean there is nothing to
    do. Otherwise the script reports the difference and decides whether it may
    apply it, which depends on `--check`, on the update mode, on whether the
@@ -197,15 +200,16 @@ declares the same versions as the previous one reuses the image that was just
 built, in seconds. It also means two instances are never out of service at the
 same time.
 
-A failed update stops the run. The version that broke one instance is unlikely
-to be good for the next one, so the instances left are reported as not
-attempted rather than updated. Everything else continues: an instance that is
-up to date, that only reports, that is locked or that is refused has changed
-nothing, and the next instance is unaffected.
+An update that fails after having started to change an instance stops the run.
+That version is unlikely to be good for the next instance, so the ones left are
+reported as not attempted rather than updated. Everything else continues: an
+instance that is up to date, that only reports, that is locked, that is refused
+or that could not read the declared version has changed nothing, and the next
+instance is unaffected.
 
 The exit status is the most serious one of the host, in this order: an update
-failed, a usage or configuration error, a refusal, an update already running,
-an update available, nothing to report.
+failed after changing something, a usage or configuration error, a refusal, an
+update already running, an update available, nothing to report.
 
 The directory is the one the units use, so it holds one environment file per
 instance and nothing else. For scheduled updates there is no need for this

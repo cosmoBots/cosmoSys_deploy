@@ -32,7 +32,8 @@ previous image, which does not undo a migration that already ran.
 
 Exit status: 0 up to date or updated, 10 an update is available and was not
 applied, 4 another update of this instance is already running, 3 refused,
-2 usage or configuration error, 1 the update failed.
+2 usage or configuration error, with nothing touched, 1 the update failed
+after having started to change the instance.
 EOF
 }
 
@@ -150,10 +151,14 @@ else
     refs/remotes/*)
       source_remote=${source_full_ref#refs/remotes/}
       source_remote=${source_remote%%/*}
+      # Not being able to read the declared version changes nothing and says
+      # nothing about the version itself, so it is a configuration error here
+      # and not a failed update that should stop a run over a whole host.
       if ! git -C "$deployment_repository_dir" fetch --quiet "$source_remote"; then
-        echo "Cannot fetch from $source_remote. An unattended update needs a read-only" >&2
-        echo "deploy key on this host, because no SSH agent is forwarded to it." >&2
-        exit 1
+        echo "Cannot fetch from $source_remote, so the declared version cannot be read." >&2
+        echo "An unattended update needs a read-only deploy key on this host, because" >&2
+        echo "no SSH agent is forwarded to it. The instance was left untouched." >&2
+        exit 2
       fi
       ;;
   esac

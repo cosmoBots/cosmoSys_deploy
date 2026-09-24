@@ -28,8 +28,9 @@ instance is unlikely to be good for the next one. The instances left are
 reported as not attempted.
 
 Exit status: the most serious status of the instances, in this order: 1 an
-update failed, 2 usage or configuration error, 3 refused, 4 another update was
-running, 10 an update is available, 0 nothing to report.
+update failed after changing something, 2 usage or configuration error, 3
+refused, 4 another update was running, 10 an update is available, 0 nothing to
+report.
 EOF
 }
 

@@ -197,9 +197,10 @@ registers the expected plugins.
 The declared version is read from `origin/main` with `git fetch` and
 `git show`, never from the working tree, so the script works the same on a
 plain clone and on a submodule with a detached HEAD, and it never modifies the
-checkout. `--source REF` reads another reference, and `--pins FILE` takes the
-revisions from a file, which is how one instance is held at an older
-combination.
+checkout. A host with no SSH agent needs a read-only deploy key for that fetch;
+without one the script stops as a configuration error, having touched nothing.
+`--source REF` reads another reference, and `--pins FILE` takes the revisions
+from a file, which is how one instance is held at an older combination.
 
 Because those revisions end up in the instance environment file, every instance
 carries its own version: two instances sharing a checkout can run different
