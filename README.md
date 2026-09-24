@@ -137,8 +137,8 @@ Current pins (see `.env.example` and `compose*.yml`):
 | Component | Version | Commit | Tag |
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
-| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.4 | `7819c0b` | `0.1.4` |
-| cosmoSys Requirements | 0.3.0 | `8b89027` | `0.3.0` |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.5 | `312b560` | `0.1.5` + localization |
+| cosmoSys Requirements | 0.3.1 | `9479098` | `0.3.1` + localization |
 | rspreadsheet | pin | `c01d413` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
@@ -150,11 +150,12 @@ running image identifies the exact plugin revision.
 **Versioning strategy.** The plugins own their version numbers (declared in
 their `init.rb`) and their release tags; the deployment repository does not
 duplicate them. This repository has no version number of its own: it follows
-the plugins and pins what it validated. The plugins' `init.rb` version and its
-git tag must always agree, and the deployment's `COSMOSYS_REVISION` /
-`COSMOSYS_REQ_REVISION` pin the exact commit behind that tag. When a plugin
-publishes a new tag, update the pins here and validate both variants before
-committing.
+the plugins and pins the exact commit it validated. Ordinarily `init.rb` and
+the release tag agree with that commit. A translation-only maintenance commit
+may retain the current semantic version without moving an existing tag, when it
+changes no runtime contract, schema or migration; the table must identify that
+exception and the immutable `COSMOSYS_REVISION` / `COSMOSYS_REQ_REVISION` remain
+the deployment authority. Validate both variants before committing new pins.
 
 Those revisions and the base image are declared only in the Compose files and
 `.env`, so the image is built through Compose. A direct `docker build` has to
