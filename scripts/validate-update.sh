@@ -31,6 +31,7 @@ export COSMOSYS_ENV_FILE="$COSMOSYS_INSTANCES_DIR/instance.env"
 export COSMOSYS_BACKUP_ROOT="$validation_directory/backups"
 instance_lock="${TMPDIR:-/tmp}/cosmosys-update-csys_update_validation_$suffix.lock"
 stale_ref=
+unreachable_ref=
 
 # The release the instance starts from. The target is whatever this checkout
 # declares, so the validation follows the repository instead of a fixed pair.
@@ -63,9 +64,11 @@ cleanup() {
   fi
   deployment_compose down --volumes --remove-orphans >/dev/null 2>&1 || true
   rm -rf -- "$instance_lock"
-  if [ -n "$stale_ref" ]; then
-    git -C "$deployment_repository_dir" update-ref -d "$stale_ref" 2>/dev/null || true
-  fi
+  for leftover_ref in "$stale_ref" "$unreachable_ref"; do
+    if [ -n "$leftover_ref" ]; then
+      git -C "$deployment_repository_dir" update-ref -d "$leftover_ref" 2>/dev/null || true
+    fi
+  done
   docker image rm -f "$baseline_image" "$baseline_req_image" \
     "$target_image" "$target_req_image" \
     "cosmobots/cosmosys-update-validation:broken-$suffix" \
@@ -255,6 +258,33 @@ if git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
 
   git -C "$deployment_repository_dir" update-ref -d "$stale_ref"
   stale_ref=
+
+  # A remote that cannot be fetched is a configuration problem of the host, not
+  # a bad version, so it must not look like a failed update. The remote is
+  # injected through the environment, so the configuration of the checkout is
+  # not touched either.
+  echo "Checking that an unreachable remote is a configuration error..."
+  unreachable_ref="refs/remotes/validation-$suffix/main"
+  git -C "$deployment_repository_dir" update-ref "$unreachable_ref" HEAD
+  update_status=0
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0="remote.validation-$suffix.url" \
+    GIT_CONFIG_VALUE_0="$validation_directory/there-is-no-repository-here" \
+    GIT_CONFIG_KEY_1="remote.validation-$suffix.fetch" \
+    GIT_CONFIG_VALUE_1="+refs/heads/*:refs/remotes/validation-$suffix/*" \
+    update --check --source "validation-$suffix/main" \
+    >"$validation_directory/unreachable.log" 2>&1 || update_status=$?
+  git -C "$deployment_repository_dir" update-ref -d "$unreachable_ref"
+  unreachable_ref=
+  if [ "$update_status" -ne 2 ]; then
+    echo "An unreachable remote returned $update_status instead of 2" >&2
+    cat "$validation_directory/unreachable.log" >&2
+    exit 1
+  fi
+  if [ "$(running_revision)" != "$baseline_revision" ]; then
+    echo "An unreachable remote changed the running instance" >&2
+    exit 1
+  fi
 else
   echo "Skipping the git reference check: this is not a git checkout."
 fi
