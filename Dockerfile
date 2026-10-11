@@ -38,6 +38,24 @@ COPY bootstrap /opt/cosmosys-deploy/bootstrap
 LABEL eu.cosmobots.cosmosys.revision="${COSMOSYS_REVISION}" \
       eu.cosmobots.rspreadsheet.revision="${RSPREADSHEET_REVISION}"
 
+FROM cosmosys_base AS cosmosys_kroki
+
+ARG REDMINE_KROKI_REVISION
+
+RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
+    && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
+    && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
+    && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
+    && test -f plugins/redmine_kroki/init.rb \
+    && rm -rf /tmp/redmine-kroki \
+    && bundle install \
+    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+
+COPY kroki_compat plugins/redmine_kroki_compat
+
+LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}"
+
 FROM cosmosys_base AS cosmosys_requirements
 
 ARG COSMOSYS_REQ_REVISION
@@ -51,3 +69,21 @@ RUN : "${COSMOSYS_REQ_REVISION:?Pass COSMOSYS_REQ_REVISION as a build argument}"
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
 LABEL eu.cosmobots.cosmosys-req.revision="${COSMOSYS_REQ_REVISION}"
+
+FROM cosmosys_requirements AS cosmosys_requirements_kroki
+
+ARG REDMINE_KROKI_REVISION
+
+RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
+    && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
+    && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
+    && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
+    && test -f plugins/redmine_kroki/init.rb \
+    && rm -rf /tmp/redmine-kroki \
+    && bundle install \
+    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+
+COPY kroki_compat plugins/redmine_kroki_compat
+
+LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}"

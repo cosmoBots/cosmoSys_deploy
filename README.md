@@ -106,6 +106,51 @@ docker compose -f compose.yml -f compose.requirements.yml build
 docker compose -f compose.yml -f compose.requirements.yml up -d
 ```
 
+## Optional Kroki support
+
+Kroki support is opt-in per instance. Set this in that instance's environment
+file:
+
+```dotenv
+COSMOSYS_KROKI_ENABLED=true
+```
+
+The Compose wrapper then adds the appropriate Kroki overlays automatically. The
+Redmine image is built with the pinned `redmine_kroki` plugin, while Kroki itself
+runs as a separate service with its official diagram-rendering companion
+services. The plugin's default server URL, `http://kroki:8000`, resolves on the
+private Compose network. No Kroki port is published on the host. Set the option
+to `false` (the default) to omit both the plugin and Kroki services; the regular
+cosmoSys images do not depend on Kroki. Kroki-enabled images also include a
+small deployment compatibility initializer: Redmine stores plugin settings with
+string keys, while the upstream macro reads them as symbols. The initializer
+provides indifferent access without patching or forking `redmine-kroki`.
+
+The gateway is explicitly run in Kroki `SECURE` safe mode. The core and four
+companion images are pinned by multi-architecture digest in `.env.example`;
+they may be overridden through the corresponding `KROKI_*_IMAGE` settings.
+The current `0.32.1` pin includes fixes for URL-loading bypasses in Vega's
+secure-mode checks; keep Kroki and its companions on a reviewed, compatible
+release rather than downgrading the image tags.
+Kroki's core image is large, so enabling it adds a substantial first pull and
+build. For a new instance, enable the option, then build and start through the
+wrapper:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh build
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh up -d
+```
+
+For a persistent instance that already contains data, use the normal
+`scripts/update-instance.sh` workflow after changing the flag so it takes a
+backup before switching to the separate Kroki image tag. `scripts/provision-instance.sh --kroki`
+can create a new instance environment file with Kroki enabled.
+
+The deployment option only adds Redmine-Kroki and the Kroki services; it does
+not make cosmoSys depend on that plugin. cosmoSys report export also sanitizes
+Kroki SVGs while preserving safe in-document references such as arrowheads and
+reused shapes, and continues to reject external resource loads.
+
 An instance with its own environment file names its variant there, so
 `scripts/compose.sh` resolves the files it needs and every Compose command
 reads the same for both variants:
@@ -137,12 +182,16 @@ Current pins (see `.env.example` and `compose*.yml`):
 | Component | Version | Commit | Tag |
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
-| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.5 | `312b560` | `0.1.5` + localization |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.6 | `0d09b5a` | `0.1.6` |
 | cosmoSys Requirements | 0.3.1 | `9479098` | `0.3.1` + localization |
 | rspreadsheet | pin | `c01d413` | n/a |
+| [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (`main` HEAD) | `9e5a9a1` | `v0.5.0` |
+| Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
-`cosmoSys Requirements`. The image tags embed the short commit of each plugin
+`cosmoSys Requirements`. Setting `COSMOSYS_KROKI_ENABLED=true` adds the
+independently pinned Redmine-Kroki plugin to either variant. The image tags
+embed the short commit of each plugin
 (`cosmobots/cosmosys:<cosmosys_short>-redmine-7.0.1` and
 `cosmobots/cosmosys-req:<cosmosys_short>-<req_short>-redmine-7.0.1`), so the
 running image identifies the exact plugin revision.

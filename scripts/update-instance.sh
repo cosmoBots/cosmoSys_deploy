@@ -84,6 +84,7 @@ fi
 instance_env=${COSMOSYS_ENV_FILE:-"$deployment_repository_dir/.env"}
 variant=$(deployment_variant)
 database_mode=$(deployment_db_mode)
+kroki_enabled=$(deployment_kroki_enabled)
 update_mode=$(deployment_setting COSMOSYS_UPDATE_MODE manual)
 
 case "$update_mode" in
@@ -107,6 +108,7 @@ running_image=$(docker inspect --format '{{.Config.Image}}' "$redmine_container"
 running_cosmosys=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys.revision)
 running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmobots.rspreadsheet.revision)
 running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
+running_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)
 
 # An instance provisioned before the variant was recorded runs the Requirements
 # image while its environment file says nothing, so it resolves to the base
@@ -173,8 +175,9 @@ else
   # Everything that ends up inside the image, so that a stale checkout cannot
   # publish something else under the image tag that names those revisions.
   if git -C "$deployment_repository_dir" diff --quiet "$source_ref" -- \
-    Dockerfile compose.yml compose.requirements.yml compose.shared-db.yml \
-    compose.proxy.yml config bootstrap; then
+    Dockerfile compose.yml compose.requirements.yml compose.kroki.yml \
+    compose.requirements-kroki.yml compose.shared-db.yml compose.proxy.yml \
+    config bootstrap; then
     deployment_drift=no
   else
     deployment_drift=yes
@@ -183,24 +186,49 @@ fi
 
 declared_cosmosys=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REVISION)
 declared_cosmosys_req=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_REVISION)
+declared_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_KROKI_REVISION)
 declared_rspreadsheet=$(printf '%s\n' "$declared_env" | declared_setting RSPREADSHEET_REVISION)
 declared_redmine_image=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_IMAGE)
 declared_postgres_image=$(printf '%s\n' "$declared_env" | declared_setting POSTGRES_IMAGE)
 declared_image=$(printf '%s\n' "$declared_compose" | declared_compose_image COSMOSYS_IMAGE)
 declared_req_image=$(printf '%s\n' "$declared_requirements" | declared_compose_image COSMOSYS_REQ_IMAGE)
+declared_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
+declared_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
 
 if [ -n "$pins_file" ]; then
   # A pins file may name the image explicitly instead of relying on Compose.
   pins_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_IMAGE)
   pins_req_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_IMAGE)
+  pins_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
+  pins_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
   declared_image=${pins_image:-$declared_image}
   declared_req_image=${pins_req_image:-$declared_req_image}
+  declared_kroki_image=${pins_kroki_image:-$declared_kroki_image}
+  declared_req_kroki_image=${pins_req_kroki_image:-$declared_req_kroki_image}
+fi
+
+declared_effective_image=$declared_image
+declared_effective_req_image=$declared_req_image
+
+if [ "$kroki_enabled" = true ]; then
+  if [ -z "$declared_kroki_revision" ] || [ -z "$declared_kroki_image" ]; then
+    echo "Kroki is enabled, but its plugin revision or base image is not declared." >&2
+    exit 2
+  fi
+  declared_effective_image=$declared_kroki_image
+  if [ "$variant" = requirements ]; then
+    if [ -z "$declared_req_kroki_image" ]; then
+      echo "Kroki is enabled, but its Requirements image is not declared." >&2
+      exit 2
+    fi
+    declared_effective_req_image=$declared_req_kroki_image
+  fi
 fi
 
 if [ "$variant" = requirements ]; then
-  declared_reference=$declared_req_image
+  declared_reference=$declared_effective_req_image
 else
-  declared_reference=$declared_image
+  declared_reference=$declared_effective_image
 fi
 
 for required in declared_cosmosys declared_rspreadsheet declared_redmine_image \
@@ -375,9 +403,16 @@ set_instance_setting RSPREADSHEET_REVISION "$declared_rspreadsheet"
 set_instance_setting REDMINE_IMAGE "$declared_redmine_image"
 set_instance_setting POSTGRES_IMAGE "$declared_postgres_image"
 set_instance_setting COSMOSYS_IMAGE "$declared_image"
+if [ "$kroki_enabled" = true ]; then
+  set_instance_setting REDMINE_KROKI_REVISION "$declared_kroki_revision"
+  set_instance_setting COSMOSYS_KROKI_IMAGE "$declared_kroki_image"
+fi
 if [ "$variant" = requirements ]; then
   set_instance_setting COSMOSYS_REQ_REVISION "$declared_cosmosys_req"
   set_instance_setting COSMOSYS_REQ_IMAGE "$declared_req_image"
+  if [ "$kroki_enabled" = true ]; then
+    set_instance_setting COSMOSYS_REQ_KROKI_IMAGE "$declared_req_kroki_image"
+  fi
 fi
 
 # The only step that knows where an image comes from. With a registry this
@@ -414,14 +449,27 @@ if [ "$variant" = requirements ]; then
     update_failed "The instance runs cosmoSys Requirements $updated_cosmosys_req instead of $declared_cosmosys_req."
   fi
 fi
+if [ "$kroki_enabled" = true ]; then
+  updated_kroki=$(deployment_container_label "$updated_container" eu.cosmobots.redmine-kroki.revision)
+  if [ "$updated_kroki" != "$declared_kroki_revision" ]; then
+    update_failed "The instance runs Redmine-Kroki $updated_kroki instead of $declared_kroki_revision."
+  fi
+fi
 
 expected_plugins=cosmosys
 if [ "$variant" = requirements ]; then
   expected_plugins="cosmosys cosmosys_req"
 fi
+if [ "$kroki_enabled" = true ]; then
+  expected_plugins="$expected_plugins redmine_kroki"
+fi
 if ! deployment_compose exec -T redmine bundle exec rails runner \
   "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"missing plugins: #{missing.join(', ')}\") unless missing.empty?"; then
   update_failed "The updated instance does not register the expected plugins."
+fi
+if [ "$kroki_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
+  "abort('Redmine-Kroki settings compatibility initializer is missing') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); settings = Setting.plugin_redmine_kroki; abort('Redmine-Kroki settings are not readable by symbol key') unless settings[:kroki_url] == settings['kroki_url']"; then
+  update_failed "The updated Kroki image lacks the settings compatibility initializer."
 fi
 
 cat <<EOF

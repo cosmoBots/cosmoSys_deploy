@@ -4,9 +4,9 @@ set -eu
 variant=${1:-all}
 
 case "$variant" in
-  base|requirements|all) ;;
+  base|requirements|all|base-kroki|requirements-kroki) ;;
   *)
-    echo "Usage: $0 [base|requirements|all]" >&2
+    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki]" >&2
     exit 2
     ;;
 esac
@@ -15,6 +15,7 @@ repository_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 validate_variant() {
   selected_variant=$1
+  kroki_enabled=${2:-false}
   validation_project="csys_deploy_validation_${selected_variant}_$$"
   compose_files="-f $repository_dir/compose.yml"
   expected_plugins="cosmosys"
@@ -22,6 +23,14 @@ validate_variant() {
   if [ "$selected_variant" = requirements ]; then
     compose_files="$compose_files -f $repository_dir/compose.requirements.yml"
     expected_plugins="cosmosys cosmosys_req"
+  fi
+
+  if [ "$kroki_enabled" = true ]; then
+    compose_files="$compose_files -f $repository_dir/compose.kroki.yml"
+    if [ "$selected_variant" = requirements ]; then
+      compose_files="$compose_files -f $repository_dir/compose.requirements-kroki.yml"
+    fi
+    expected_plugins="$expected_plugins redmine_kroki"
   fi
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
@@ -45,14 +54,20 @@ validate_variant() {
 
   echo "Validating $selected_variant as isolated Compose project $validation_project..."
   compose config --quiet
-  if ! compose up -d --wait redmine; then
+  if ! compose up --build -d --wait redmine; then
     echo "Migration and startup logs for $selected_variant:" >&2
     compose logs --no-color --tail 200 migrate redmine >&2 || true
     return 1
   fi
 
   compose exec -T redmine bundle exec rails runner \
-    "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if expected == ['cosmosys'] && actual.include?('cosmosys_req')"
+    "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req') && !expected.include?('cosmosys_req')"
+  if [ "$kroki_enabled" = true ]; then
+    compose exec -T redmine bundle exec rails runner \
+      "abort('Kroki compatibility initializer not loaded') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); Setting.plugin_redmine_kroki = {'kroki_url' => 'http://kroki:8000'}; settings = Setting.plugin_redmine_kroki; abort('Kroki settings do not support symbol access') unless settings[:kroki_url] == 'http://kroki:8000'; abort('Kroki settings lost string access') unless settings['kroki_url'] == 'http://kroki:8000'"
+    compose exec -T redmine bundle exec rails runner \
+      "require 'net/http'; response = Net::HTTP.post(URI('http://kroki:8000/graphviz/svg'), 'digraph G { A -> B }', 'Content-Type' => 'text/plain'); abort(\"Kroki returned #{response.code}\") unless response.is_a?(Net::HTTPSuccess)"
+  fi
   compose exec -T redmine bundle exec rails runner \
     "public_help = Project.find_by(identifier: 'csys_help'); admin_help = Project.find_by(identifier: 'csys_admin_help'); abort('missing public help') unless public_help&.is_public?; abort('missing private admin help') unless admin_help && !admin_help.is_public?; abort('missing help pages') unless public_help.wiki.find_page('csInt_Overview', with_redirect: false) && public_help.wiki.find_page('Overview', with_redirect: false); abort('missing managed registry') unless Setting.where(name: 'cosmosys_managed_content_registry').exists?"
   compose exec -T redmine bundle exec rails runner \
@@ -79,6 +94,10 @@ validate_variant() {
 if [ "$variant" = all ]; then
   validate_variant base
   validate_variant requirements
+elif [ "$variant" = base-kroki ]; then
+  validate_variant base true
+elif [ "$variant" = requirements-kroki ]; then
+  validate_variant requirements true
 else
   validate_variant "$variant"
 fi

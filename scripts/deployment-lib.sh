@@ -69,6 +69,21 @@ deployment_variant() {
   esac
 }
 
+# Prints "true" or "false" for the optional Kroki plugin and services.
+deployment_kroki_enabled() {
+  kroki_enabled_value=$(deployment_setting COSMOSYS_KROKI_ENABLED false) || return
+
+  case "$kroki_enabled_value" in
+    true|false)
+      printf '%s\n' "$kroki_enabled_value"
+      ;;
+    *)
+      echo "COSMOSYS_KROKI_ENABLED must be true or false" >&2
+      return 2
+      ;;
+  esac
+}
+
 # Prints a label of a container, or "unknown" when the image predates it.
 deployment_container_label() {
   label_value=$(docker inspect --format "{{index .Config.Labels \"$2\"}}" "$1")
@@ -86,6 +101,7 @@ deployment_compose() {
   db_mode=$(deployment_db_mode) || return
   proxy_mode=$(deployment_proxy_mode) || return
   variant=$(deployment_variant) || return
+  kroki_enabled=$(deployment_kroki_enabled) || return
 
   if [ -n "${COSMOSYS_COMPOSE_PROJECT:-}" ]; then
     set -- -p "$COSMOSYS_COMPOSE_PROJECT" "$@"
@@ -97,6 +113,17 @@ deployment_compose() {
       return 2
     fi
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
+  fi
+
+  # These arguments are prepended, so add Kroki overlays first. The resulting
+  # Compose order must be base -> Requirements -> shared DB/proxy -> Kroki ->
+  # Requirements+Kroki, otherwise the base Kroki overlay can replace the
+  # Requirements build target.
+  if [ "$kroki_enabled" = true ]; then
+    if [ "$variant" = requirements ]; then
+      set -- -f "$deployment_repository_dir/compose.requirements-kroki.yml" "$@"
+    fi
+    set -- -f "$deployment_repository_dir/compose.kroki.yml" "$@"
   fi
 
   if [ "$proxy_mode" = shared ]; then

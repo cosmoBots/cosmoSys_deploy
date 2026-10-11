@@ -1,0 +1,59 @@
+x-kroki-redmine-image: &kroki-redmine-image
+  image: ${COSMOSYS_KROKI_IMAGE:-cosmobots/cosmosys-kroki:0d09b5a-9e5a9a1-redmine-7.0.1}
+  build:
+    target: cosmosys_kroki
+    args:
+      REDMINE_KROKI_REVISION: ${REDMINE_KROKI_REVISION:-9e5a9a1ad1e8557d490558fa01ed98484386cbfd}
+
+services:
+  migrate:
+    <<: *kroki-redmine-image
+
+  bootstrap:
+    <<: *kroki-redmine-image
+
+  redmine:
+    <<: *kroki-redmine-image
+    depends_on:
+      - kroki
+
+  kroki:
+    image: ${KROKI_SERVER_IMAGE:-yuzutech/kroki:0.32.1@sha256:6980bfb218b48b74ea14b888d9c7e8c032d1cb6325f3292277abdf62483abd9d}
+    restart: unless-stopped
+    environment:
+      KROKI_SAFE_MODE: SECURE
+      KROKI_MERMAID_HOST: kroki-mermaid
+      KROKI_BPMN_HOST: kroki-bpmn
+      KROKI_EXCALIDRAW_HOST: kroki-excalidraw
+      KROKI_DIAGRAMSNET_HOST: kroki-diagramsnet
+    expose:
+      - "8000"
+    depends_on:
+      - kroki-mermaid
+      - kroki-bpmn
+      - kroki-excalidraw
+      - kroki-diagramsnet
+
+  kroki-mermaid:
+    image: ${KROKI_MERMAID_IMAGE:-yuzutech/kroki-mermaid:0.32.1@sha256:ad6721646aabfb8b5f5005db2daa6e37189c25e18aab19a8ef8590b6171cd192}
+    restart: unless-stopped
+    expose:
+      - "8002"
+
+  kroki-bpmn:
+    image: ${KROKI_BPMN_IMAGE:-yuzutech/kroki-bpmn:0.32.1@sha256:1558692f39cbede20f70f732d34c906dde7a3333e004f55dc66ea8fbfc3e7d70}
+    restart: unless-stopped
+    expose:
+      - "8003"
+
+  kroki-excalidraw:
+    image: ${KROKI_EXCALIDRAW_IMAGE:-yuzutech/kroki-excalidraw:0.32.1@sha256:214f13c1cd3c3f79a18a83631a900fedbed71b2f39d3a0c5630ac5fa5ad40046}
+    restart: unless-stopped
+    expose:
+      - "8004"
+
+  kroki-diagramsnet:
+    image: ${KROKI_DIAGRAMSNET_IMAGE:-yuzutech/kroki-diagramsnet:0.32.1@sha256:71e7082f736ec003fb33b5cd1c5c40af54c9bfb6351d50fbe73b56fe8f1bd5eb}
+    restart: unless-stopped
+    expose:
+      - "8005"

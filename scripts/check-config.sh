@@ -15,8 +15,14 @@ proxy_tls=${COSMOSYS_PROXY_TLS:-internal}
 
 docker compose -f compose.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml config --quiet
+docker compose -f compose.yml -f compose.kroki.yml config --quiet
+docker compose -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
+  -f compose.requirements-kroki.yml config --quiet
 docker compose -f compose.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml -f compose.shared-db.yml config --quiet
+docker compose -f compose.yml -f compose.kroki.yml -f compose.shared-db.yml config --quiet
+docker compose -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
+  -f compose.requirements-kroki.yml -f compose.shared-db.yml config --quiet
 COSMOSYS_HOSTNAME=$proxy_hostname COSMOSYS_PROXY_TLS=$proxy_tls \
   docker compose -f compose.yml -f compose.proxy.yml config --quiet
 COSMOSYS_HOSTNAME=$proxy_hostname COSMOSYS_PROXY_TLS=$proxy_tls \
