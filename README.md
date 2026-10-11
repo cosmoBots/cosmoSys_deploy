@@ -116,11 +116,12 @@ COSMOSYS_KROKI_ENABLED=true
 ```
 
 The Compose wrapper then adds the appropriate Kroki overlays automatically. The
-Redmine image is built with the pinned `redmine_kroki` plugin, while Kroki itself
-runs as a separate service with its official diagram-rendering companion
-services. The plugin's default server URL, `http://kroki:8000`, resolves on the
+Redmine image is built with the pinned `redmine_kroki` and `cosmosys_kroki`
+plugins, while Kroki itself runs as a separate service with its official
+diagram-rendering companion services. Their default server URL,
+`http://kroki:8000`, resolves on the
 private Compose network. No Kroki port is published on the host. Set the option
-to `false` (the default) to omit both the plugin and Kroki services; the regular
+to `false` (the default) to omit both plugins and the Kroki services; the regular
 cosmoSys images do not depend on Kroki. Kroki-enabled images also include a
 small deployment compatibility initializer: Redmine stores plugin settings with
 string keys, while the upstream macro reads them as symbols. The initializer
@@ -146,8 +147,11 @@ For a persistent instance that already contains data, use the normal
 backup before switching to the separate Kroki image tag. `scripts/provision-instance.sh --kroki`
 can create a new instance environment file with Kroki enabled.
 
-The deployment option only adds Redmine-Kroki and the Kroki services; it does
-not make cosmoSys depend on that plugin. cosmoSys report export also sanitizes
+The deployment option adds both Kroki integration plugins and the Kroki
+services; it does not make the ordinary cosmoSys image depend on either plugin
+or on a Kroki server. `cosmosys_kroki` adapts Mermaid macros during cosmoSys
+report export so their labels survive ODT conversion; it is installed only in
+the Kroki-enabled image variant. cosmoSys report export also sanitizes
 Kroki SVGs while preserving safe in-document references such as arrowheads and
 reused shapes, and continues to reject external resource loads.
 
@@ -172,10 +176,10 @@ that must be validated for both deployment variants.
 
 ## Components and source revisions
 
-This deployment installs two cosmoSys plugins on top of the pinned Redmine
-image. For every change, each plugin repository declares a semantic version
-and a release tag; the deployment pins the exact commit (and therefore the
-tagged release) that was validated.
+This deployment installs cosmoSys plugins on top of the pinned Redmine image.
+For every change, each plugin repository declares a semantic version
+and, where applicable, a release tag; the deployment pins the exact commit
+that was validated.
 
 Current pins (see `.env.example` and `compose*.yml`):
 
@@ -185,13 +189,16 @@ Current pins (see `.env.example` and `compose*.yml`):
 | [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.6 | `0d09b5a` | `0.1.6` |
 | cosmoSys Requirements | 0.3.1 | `9479098` | `0.3.1` + localization |
 | rspreadsheet | pin | `c01d413` | n/a |
-| [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (`main` HEAD) | `9e5a9a1` | `v0.5.0` |
+| [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (fork version fix) | `489602a` | none |
+| [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `fbf74b2` | n/a |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
 `cosmoSys Requirements`. Setting `COSMOSYS_KROKI_ENABLED=true` adds the
-independently pinned Redmine-Kroki plugin to either variant. The image tags
-embed the short commit of each plugin
+independently pinned Redmine-Kroki and `cosmosys_kroki` plugins to either
+variant. Kroki image tags embed the short commits of cosmoSys, Redmine-Kroki
+and `cosmosys_kroki` (plus cosmoSys Requirements in that variant); the regular
+image tags identify their cosmoSys plugin revisions:
 (`cosmobots/cosmosys:<cosmosys_short>-redmine-7.0.1` and
 `cosmobots/cosmosys-req:<cosmosys_short>-<req_short>-redmine-7.0.1`), so the
 running image identifies the exact plugin revision.

@@ -109,6 +109,7 @@ running_cosmosys=$(deployment_container_label "$redmine_container" eu.cosmobots.
 running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmobots.rspreadsheet.revision)
 running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 running_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)
+running_cosmosys_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-kroki.revision)
 
 # An instance provisioned before the variant was recorded runs the Requirements
 # image while its environment file says nothing, so it resolves to the base
@@ -187,6 +188,7 @@ fi
 declared_cosmosys=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REVISION)
 declared_cosmosys_req=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_REVISION)
 declared_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_KROKI_REVISION)
+declared_cosmosys_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_REVISION)
 declared_rspreadsheet=$(printf '%s\n' "$declared_env" | declared_setting RSPREADSHEET_REVISION)
 declared_redmine_image=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_IMAGE)
 declared_postgres_image=$(printf '%s\n' "$declared_env" | declared_setting POSTGRES_IMAGE)
@@ -211,8 +213,8 @@ declared_effective_image=$declared_image
 declared_effective_req_image=$declared_req_image
 
 if [ "$kroki_enabled" = true ]; then
-  if [ -z "$declared_kroki_revision" ] || [ -z "$declared_kroki_image" ]; then
-    echo "Kroki is enabled, but its plugin revision or base image is not declared." >&2
+  if [ -z "$declared_kroki_revision" ] || [ -z "$declared_cosmosys_kroki_revision" ] || [ -z "$declared_kroki_image" ]; then
+    echo "Kroki is enabled, but its plugin revisions or base image are not declared." >&2
     exit 2
   fi
   declared_effective_image=$declared_kroki_image
@@ -405,6 +407,7 @@ set_instance_setting POSTGRES_IMAGE "$declared_postgres_image"
 set_instance_setting COSMOSYS_IMAGE "$declared_image"
 if [ "$kroki_enabled" = true ]; then
   set_instance_setting REDMINE_KROKI_REVISION "$declared_kroki_revision"
+  set_instance_setting COSMOSYS_KROKI_REVISION "$declared_cosmosys_kroki_revision"
   set_instance_setting COSMOSYS_KROKI_IMAGE "$declared_kroki_image"
 fi
 if [ "$variant" = requirements ]; then
@@ -454,6 +457,10 @@ if [ "$kroki_enabled" = true ]; then
   if [ "$updated_kroki" != "$declared_kroki_revision" ]; then
     update_failed "The instance runs Redmine-Kroki $updated_kroki instead of $declared_kroki_revision."
   fi
+  updated_cosmosys_kroki=$(deployment_container_label "$updated_container" eu.cosmobots.cosmosys-kroki.revision)
+  if [ "$updated_cosmosys_kroki" != "$declared_cosmosys_kroki_revision" ]; then
+    update_failed "The instance runs cosmoSys Kroki $updated_cosmosys_kroki instead of $declared_cosmosys_kroki_revision."
+  fi
 fi
 
 expected_plugins=cosmosys
@@ -461,7 +468,7 @@ if [ "$variant" = requirements ]; then
   expected_plugins="cosmosys cosmosys_req"
 fi
 if [ "$kroki_enabled" = true ]; then
-  expected_plugins="$expected_plugins redmine_kroki"
+  expected_plugins="$expected_plugins redmine_kroki cosmosys_kroki"
 fi
 if ! deployment_compose exec -T redmine bundle exec rails runner \
   "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"missing plugins: #{missing.join(', ')}\") unless missing.empty?"; then

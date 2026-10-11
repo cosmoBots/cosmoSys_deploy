@@ -41,20 +41,28 @@ LABEL eu.cosmobots.cosmosys.revision="${COSMOSYS_REVISION}" \
 FROM cosmosys_base AS cosmosys_kroki
 
 ARG REDMINE_KROKI_REVISION
+ARG COSMOSYS_KROKI_REVISION
 
 RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
+    && : "${COSMOSYS_KROKI_REVISION:?Pass COSMOSYS_KROKI_REVISION as a build argument}" \
     && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
     && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
     && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
     && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
     && test -f plugins/redmine_kroki/init.rb \
     && rm -rf /tmp/redmine-kroki \
+    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_kroki.git plugins/cosmosys_kroki \
+    && git -C plugins/cosmosys_kroki checkout "${COSMOSYS_KROKI_REVISION}" \
+    && test "$(git -C plugins/cosmosys_kroki rev-parse HEAD)" = "${COSMOSYS_KROKI_REVISION}" \
+    && test -f plugins/cosmosys_kroki/init.rb \
+    && rm -rf plugins/cosmosys_kroki/.git \
     && bundle install \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
 COPY kroki_compat plugins/redmine_kroki_compat
 
-LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}"
+LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}" \
+      eu.cosmobots.cosmosys-kroki.revision="${COSMOSYS_KROKI_REVISION}"
 
 FROM cosmosys_base AS cosmosys_requirements
 
@@ -73,17 +81,25 @@ LABEL eu.cosmobots.cosmosys-req.revision="${COSMOSYS_REQ_REVISION}"
 FROM cosmosys_requirements AS cosmosys_requirements_kroki
 
 ARG REDMINE_KROKI_REVISION
+ARG COSMOSYS_KROKI_REVISION
 
 RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
+    && : "${COSMOSYS_KROKI_REVISION:?Pass COSMOSYS_KROKI_REVISION as a build argument}" \
     && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
     && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
     && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
     && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
     && test -f plugins/redmine_kroki/init.rb \
     && rm -rf /tmp/redmine-kroki \
+    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_kroki.git plugins/cosmosys_kroki \
+    && git -C plugins/cosmosys_kroki checkout "${COSMOSYS_KROKI_REVISION}" \
+    && test "$(git -C plugins/cosmosys_kroki rev-parse HEAD)" = "${COSMOSYS_KROKI_REVISION}" \
+    && test -f plugins/cosmosys_kroki/init.rb \
+    && rm -rf plugins/cosmosys_kroki/.git \
     && bundle install \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
 COPY kroki_compat plugins/redmine_kroki_compat
 
-LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}"
+LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}" \
+      eu.cosmobots.cosmosys-kroki.revision="${COSMOSYS_KROKI_REVISION}"

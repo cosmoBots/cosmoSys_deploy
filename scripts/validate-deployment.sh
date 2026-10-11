@@ -30,7 +30,7 @@ validate_variant() {
     if [ "$selected_variant" = requirements ]; then
       compose_files="$compose_files -f $repository_dir/compose.requirements-kroki.yml"
     fi
-    expected_plugins="$expected_plugins redmine_kroki"
+    expected_plugins="$expected_plugins redmine_kroki cosmosys_kroki"
   fi
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
@@ -64,7 +64,7 @@ validate_variant() {
     "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req') && !expected.include?('cosmosys_req')"
   if [ "$kroki_enabled" = true ]; then
     compose exec -T redmine bundle exec rails runner \
-      "abort('Kroki compatibility initializer not loaded') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); Setting.plugin_redmine_kroki = {'kroki_url' => 'http://kroki:8000'}; settings = Setting.plugin_redmine_kroki; abort('Kroki settings do not support symbol access') unless settings[:kroki_url] == 'http://kroki:8000'; abort('Kroki settings lost string access') unless settings['kroki_url'] == 'http://kroki:8000'"
+      "abort('Kroki compatibility initializer not loaded') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); Setting.plugin_redmine_kroki = {'kroki_url' => 'http://kroki:8000'}; settings = Setting.plugin_redmine_kroki; abort('Kroki settings do not support symbol access') unless settings[:kroki_url] == 'http://kroki:8000'; abort('Kroki settings lost string access') unless settings['kroki_url'] == 'http://kroki:8000'; abort('cosmoSys Kroki report-export patch not loaded') unless Cosmosys::ItemsController.ancestors.include?(CosmosysKroki::ItemsControllerPatch); abort('cosmoSys Kroki macro patch not loaded') unless Redmine::WikiFormatting::Macros::Definitions.ancestors.include?(CosmosysKroki::MacroDefinitionsPatch)"
     compose exec -T redmine bundle exec rails runner \
       "require 'net/http'; response = Net::HTTP.post(URI('http://kroki:8000/graphviz/svg'), 'digraph G { A -> B }', 'Content-Type' => 'text/plain'); abort(\"Kroki returned #{response.code}\") unless response.is_a?(Net::HTTPSuccess)"
   fi
