@@ -4,9 +4,9 @@ set -eu
 variant=${1:-all}
 
 case "$variant" in
-  base|requirements|all|base-kroki|requirements-kroki) ;;
+  base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex) ;;
   *)
-    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki]" >&2
+    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex]" >&2
     exit 2
     ;;
 esac
@@ -16,6 +16,7 @@ repository_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 validate_variant() {
   selected_variant=$1
   kroki_enabled=${2:-false}
+  latex_enabled=${3:-false}
   validation_project="csys_deploy_validation_${selected_variant}_$$"
   compose_files="-f $repository_dir/compose.yml"
   expected_plugins="cosmosys"
@@ -31,6 +32,10 @@ validate_variant() {
       compose_files="$compose_files -f $repository_dir/compose.requirements-kroki.yml"
     fi
     expected_plugins="$expected_plugins redmine_kroki cosmosys_kroki"
+  fi
+  if [ "$latex_enabled" = true ]; then
+    compose_files="$compose_files -f $repository_dir/compose.requirements-kroki-latex.yml"
+    expected_plugins="$expected_plugins redmine_cbots_latex"
   fi
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
@@ -68,6 +73,10 @@ validate_variant() {
     compose exec -T redmine bundle exec rails runner \
       "require 'net/http'; response = Net::HTTP.post(URI('http://kroki:8000/graphviz/svg'), 'digraph G { A -> B }', 'Content-Type' => 'text/plain'); abort(\"Kroki returned #{response.code}\") unless response.is_a?(Net::HTTPSuccess)"
   fi
+  if [ "$latex_enabled" = true ]; then
+    compose exec -T redmine bundle exec rails runner \
+      "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>$$ x^2 $$</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"
+  fi
   compose exec -T redmine bundle exec rails runner \
     "public_help = Project.find_by(identifier: 'csys_help'); admin_help = Project.find_by(identifier: 'csys_admin_help'); abort('missing public help') unless public_help&.is_public?; abort('missing private admin help') unless admin_help && !admin_help.is_public?; abort('missing help pages') unless public_help.wiki.find_page('csInt_Overview', with_redirect: false) && public_help.wiki.find_page('Overview', with_redirect: false); abort('missing managed registry') unless Setting.where(name: 'cosmosys_managed_content_registry').exists?"
   compose exec -T redmine bundle exec rails runner \
@@ -98,6 +107,8 @@ elif [ "$variant" = base-kroki ]; then
   validate_variant base true
 elif [ "$variant" = requirements-kroki ]; then
   validate_variant requirements true
+elif [ "$variant" = requirements-kroki-latex ]; then
+  validate_variant requirements true true
 else
   validate_variant "$variant"
 fi

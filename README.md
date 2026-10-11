@@ -108,12 +108,34 @@ docker compose -f compose.yml -f compose.requirements.yml up -d
 
 ## Optional Kroki support
 
+> **EXPERIMENTAL:** Kroki works, but its optional deployment wiring is
+> provisional until Iván integrates it into a more modular deployment strategy.
+> It remains opt-in; keep it disabled when it is not needed.
+
 Kroki support is opt-in per instance. Set this in that instance's environment
 file:
 
 ```dotenv
 COSMOSYS_KROKI_ENABLED=true
 ```
+
+LaTeX is also available as an experimental opt-in, currently on the highest
+stack (Requirements + Kroki) so it can be validated before the deployment is
+made more modular. The LaTeX plugin itself is independent of cosmoSys; its
+current deployment combination is only a validation step. Notebook Preview is
+not included and remains a later integration.
+
+Enable both Kroki and LaTeX in an instance environment file:
+
+```dotenv
+COSMOSYS_VARIANT=requirements
+COSMOSYS_KROKI_ENABLED=true
+COSMOSYS_LATEX_ENABLED=true
+```
+
+> **EXPERIMENTAL:** LaTeX works, but this deployment wiring is provisional
+> until Iván integrates it into a more modular deployment strategy. It is
+> currently supported only with Requirements + Kroki.
 
 The Compose wrapper then adds the appropriate Kroki overlays automatically. The
 Redmine image is built with the pinned `redmine_kroki` and `cosmosys_kroki`
@@ -191,6 +213,7 @@ Current pins (see `.env.example` and `compose*.yml`):
 | rspreadsheet | pin | `c01d413` | n/a |
 | [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (fork version fix) | `489602a` | none |
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `fbf74b2` | n/a |
+| [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `d50ee80` | n/a |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
@@ -202,6 +225,11 @@ image tags identify their cosmoSys plugin revisions:
 (`cosmobots/cosmosys:<cosmosys_short>-redmine-7.0.1` and
 `cosmobots/cosmosys-req:<cosmosys_short>-<req_short>-redmine-7.0.1`), so the
 running image identifies the exact plugin revision.
+
+Setting `COSMOSYS_LATEX_ENABLED=true` currently requires the requirements
+variant and Kroki. It adds `redmine_cbots_latex` and `python3-matplotlib` to
+that image for static formula rendering; this is the highest-stack validation
+path, not a permanent dependency on cosmoSys or Kroki.
 
 **Versioning strategy.** The plugins own their version numbers (declared in
 their `init.rb`) and their release tags; the deployment repository does not

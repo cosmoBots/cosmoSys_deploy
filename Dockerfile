@@ -38,6 +38,17 @@ COPY bootstrap /opt/cosmosys-deploy/bootstrap
 LABEL eu.cosmobots.cosmosys.revision="${COSMOSYS_REVISION}" \
       eu.cosmobots.rspreadsheet.revision="${RSPREADSHEET_REVISION}"
 
+FROM cosmosys_base AS cosmosys_latex_source
+
+ARG COSMOSYS_LATEX_REVISION
+
+RUN : "${COSMOSYS_LATEX_REVISION:?Pass COSMOSYS_LATEX_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/redmine_cbots_latex.git /tmp/redmine_cbots_latex \
+    && git -C /tmp/redmine_cbots_latex checkout "${COSMOSYS_LATEX_REVISION}" \
+    && test "$(git -C /tmp/redmine_cbots_latex rev-parse HEAD)" = "${COSMOSYS_LATEX_REVISION}" \
+    && cp -a /tmp/redmine_cbots_latex plugins/redmine_cbots_latex \
+    && rm -rf /tmp/redmine_cbots_latex/.git
+
 FROM cosmosys_base AS cosmosys_kroki
 
 ARG REDMINE_KROKI_REVISION
@@ -103,3 +114,16 @@ COPY kroki_compat plugins/redmine_kroki_compat
 
 LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}" \
       eu.cosmobots.cosmosys-kroki.revision="${COSMOSYS_KROKI_REVISION}"
+
+FROM cosmosys_requirements_kroki AS cosmosys_requirements_kroki_latex
+
+ARG COSMOSYS_LATEX_REVISION
+
+COPY --from=cosmosys_latex_source /usr/src/redmine/plugins/redmine_cbots_latex plugins/redmine_cbots_latex
+
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends python3-matplotlib \
+    && bundle install \
+    && rm -rf /var/lib/apt/lists/* /root/.bundle/cache /usr/local/bundle/cache
+
+LABEL eu.cosmobots.redmine-cbots-latex.revision="${COSMOSYS_LATEX_REVISION}"

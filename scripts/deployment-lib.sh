@@ -84,6 +84,23 @@ deployment_kroki_enabled() {
   esac
 }
 
+# Prints "true" or "false" for LaTeX. Its current deployment wiring is
+# experimental and provisional pending a more modular strategy; for now it is
+# exposed only on the full Requirements + Kroki stack.
+deployment_latex_enabled() {
+  latex_enabled_value=$(deployment_setting COSMOSYS_LATEX_ENABLED false) || return
+
+  case "$latex_enabled_value" in
+    true|false)
+      printf '%s\n' "$latex_enabled_value"
+      ;;
+    *)
+      echo "COSMOSYS_LATEX_ENABLED must be true or false" >&2
+      return 2
+      ;;
+  esac
+}
+
 # Prints a label of a container, or "unknown" when the image predates it.
 deployment_container_label() {
   label_value=$(docker inspect --format "{{index .Config.Labels \"$2\"}}" "$1")
@@ -102,6 +119,12 @@ deployment_compose() {
   proxy_mode=$(deployment_proxy_mode) || return
   variant=$(deployment_variant) || return
   kroki_enabled=$(deployment_kroki_enabled) || return
+  latex_enabled=$(deployment_latex_enabled) || return
+
+  if [ "$latex_enabled" = true ] && { [ "$variant" != requirements ] || [ "$kroki_enabled" != true ]; }; then
+    echo "COSMOSYS_LATEX_ENABLED is currently supported only with COSMOSYS_VARIANT=requirements and COSMOSYS_KROKI_ENABLED=true" >&2
+    return 2
+  fi
 
   if [ -n "${COSMOSYS_COMPOSE_PROJECT:-}" ]; then
     set -- -p "$COSMOSYS_COMPOSE_PROJECT" "$@"
@@ -113,6 +136,12 @@ deployment_compose() {
       return 2
     fi
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
+  fi
+
+  # Add the highest stack's optional layer last in Compose merge order. The
+  # deployment is deliberately limited to this combination during evaluation.
+  if [ "$latex_enabled" = true ]; then
+    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex.yml" "$@"
   fi
 
   # These arguments are prepended, so add Kroki overlays first. The resulting

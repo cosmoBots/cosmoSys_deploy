@@ -85,6 +85,7 @@ instance_env=${COSMOSYS_ENV_FILE:-"$deployment_repository_dir/.env"}
 variant=$(deployment_variant)
 database_mode=$(deployment_db_mode)
 kroki_enabled=$(deployment_kroki_enabled)
+latex_enabled=$(deployment_latex_enabled)
 update_mode=$(deployment_setting COSMOSYS_UPDATE_MODE manual)
 
 case "$update_mode" in
@@ -110,6 +111,7 @@ running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmob
 running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 running_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)
 running_cosmosys_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-kroki.revision)
+running_latex=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-cbots-latex.revision)
 
 # An instance provisioned before the variant was recorded runs the Requirements
 # image while its environment file says nothing, so it resolves to the base
@@ -177,7 +179,8 @@ else
   # publish something else under the image tag that names those revisions.
   if git -C "$deployment_repository_dir" diff --quiet "$source_ref" -- \
     Dockerfile compose.yml compose.requirements.yml compose.kroki.yml \
-    compose.requirements-kroki.yml compose.shared-db.yml compose.proxy.yml \
+    compose.requirements-kroki.yml compose.requirements-kroki-latex.yml \
+    compose.shared-db.yml compose.proxy.yml \
     config bootstrap; then
     deployment_drift=no
   else
@@ -189,6 +192,7 @@ declared_cosmosys=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_RE
 declared_cosmosys_req=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_REVISION)
 declared_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_KROKI_REVISION)
 declared_cosmosys_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_REVISION)
+declared_latex_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_LATEX_REVISION)
 declared_rspreadsheet=$(printf '%s\n' "$declared_env" | declared_setting RSPREADSHEET_REVISION)
 declared_redmine_image=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_IMAGE)
 declared_postgres_image=$(printf '%s\n' "$declared_env" | declared_setting POSTGRES_IMAGE)
@@ -196,6 +200,7 @@ declared_image=$(printf '%s\n' "$declared_compose" | declared_compose_image COSM
 declared_req_image=$(printf '%s\n' "$declared_requirements" | declared_compose_image COSMOSYS_REQ_IMAGE)
 declared_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
 declared_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
+declared_req_kroki_latex_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_IMAGE)
 
 if [ -n "$pins_file" ]; then
   # A pins file may name the image explicitly instead of relying on Compose.
@@ -227,6 +232,18 @@ if [ "$kroki_enabled" = true ]; then
   fi
 fi
 
+if [ "$latex_enabled" = true ]; then
+  if [ "$variant" != requirements ] || [ "$kroki_enabled" != true ]; then
+    echo "LaTeX is currently supported only with the Requirements + Kroki stack." >&2
+    exit 2
+  fi
+  if [ -z "$declared_latex_revision" ] || [ -z "$declared_req_kroki_latex_image" ]; then
+    echo "LaTeX is enabled, but its plugin revision or image is not declared." >&2
+    exit 2
+  fi
+  declared_effective_req_image=$declared_req_kroki_latex_image
+fi
+
 if [ "$variant" = requirements ]; then
   declared_reference=$declared_effective_req_image
 else
@@ -256,6 +273,10 @@ if [ "$variant" = requirements ]; then
   printf ', cosmoSys Requirements %s' "$declared_cosmosys_req"
 fi
 printf ', rspreadsheet %s\n' "$declared_rspreadsheet"
+if [ "$latex_enabled" = true ]; then
+  printf '          Redmine Cbots LaTeX %s\n' "$running_latex"
+  printf 'Declared: Redmine Cbots LaTeX %s\n' "$declared_latex_revision"
+fi
 
 if [ "$deployment_drift" = yes ]; then
   echo "Warning: this checkout differs from $source_ref in files that end up in" >&2
@@ -410,6 +431,10 @@ if [ "$kroki_enabled" = true ]; then
   set_instance_setting COSMOSYS_KROKI_REVISION "$declared_cosmosys_kroki_revision"
   set_instance_setting COSMOSYS_KROKI_IMAGE "$declared_kroki_image"
 fi
+if [ "$latex_enabled" = true ]; then
+  set_instance_setting COSMOSYS_LATEX_REVISION "$declared_latex_revision"
+  set_instance_setting COSMOSYS_REQ_KROKI_LATEX_IMAGE "$declared_req_kroki_latex_image"
+fi
 if [ "$variant" = requirements ]; then
   set_instance_setting COSMOSYS_REQ_REVISION "$declared_cosmosys_req"
   set_instance_setting COSMOSYS_REQ_IMAGE "$declared_req_image"
@@ -425,7 +450,7 @@ update_acquire_image() {
 }
 
 image_started=$(date +%s)
-echo "Building $declared_reference..."
+  echo "Building $declared_reference..."
 if ! update_acquire_image; then
   update_failed "The image could not be built."
 fi
@@ -462,6 +487,12 @@ if [ "$kroki_enabled" = true ]; then
     update_failed "The instance runs cosmoSys Kroki $updated_cosmosys_kroki instead of $declared_cosmosys_kroki_revision."
   fi
 fi
+if [ "$latex_enabled" = true ]; then
+  updated_latex=$(deployment_container_label "$updated_container" eu.cosmobots.redmine-cbots-latex.revision)
+  if [ "$updated_latex" != "$declared_latex_revision" ]; then
+    update_failed "The instance runs Redmine Cbots LaTeX $updated_latex instead of $declared_latex_revision."
+  fi
+fi
 
 expected_plugins=cosmosys
 if [ "$variant" = requirements ]; then
@@ -470,6 +501,9 @@ fi
 if [ "$kroki_enabled" = true ]; then
   expected_plugins="$expected_plugins redmine_kroki cosmosys_kroki"
 fi
+if [ "$latex_enabled" = true ]; then
+  expected_plugins="$expected_plugins redmine_cbots_latex"
+fi
 if ! deployment_compose exec -T redmine bundle exec rails runner \
   "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"missing plugins: #{missing.join(', ')}\") unless missing.empty?"; then
   update_failed "The updated instance does not register the expected plugins."
@@ -477,6 +511,10 @@ fi
 if [ "$kroki_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
   "abort('Redmine-Kroki settings compatibility initializer is missing') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); settings = Setting.plugin_redmine_kroki; abort('Redmine-Kroki settings are not readable by symbol key') unless settings[:kroki_url] == settings['kroki_url']"; then
   update_failed "The updated Kroki image lacks the settings compatibility initializer."
+fi
+if [ "$latex_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
+  "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"; then
+  update_failed "The updated image does not provide static LaTeX rendering."
 fi
 
 cat <<EOF

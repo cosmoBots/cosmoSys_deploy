@@ -18,6 +18,9 @@ docker compose -f compose.yml -f compose.requirements.yml config --quiet
 docker compose -f compose.yml -f compose.kroki.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
   -f compose.requirements-kroki.yml config --quiet
+COSMOSYS_LATEX_ENABLED=true docker compose \
+  -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
+  -f compose.requirements-kroki.yml -f compose.requirements-kroki-latex.yml config --quiet
 docker compose -f compose.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.kroki.yml -f compose.shared-db.yml config --quiet
