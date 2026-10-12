@@ -170,6 +170,9 @@ RUN : "${COSMOSYS_PORIS_REVISION:?Pass COSMOSYS_PORIS_REVISION as a build argume
     && test "$(git -C /tmp/cosmosys_poris rev-parse HEAD)" = "${COSMOSYS_PORIS_REVISION}" \
     && cp -a /tmp/cosmosys_poris plugins/cosmosys_poris \
     && rm -rf /tmp/cosmosys_poris/.git \
+    && test -s plugins/cosmosys_poris/assets/javascripts/poris_viewer/prod.js \
+    && ! grep -Eq 'process\.env(\.NODE_ENV)?' plugins/cosmosys_poris/assets/javascripts/poris_viewer/prod.js \
+    && test -s plugins/cosmosys_poris/assets/javascripts/poris_viewer/build-info.json \
     && bundle install \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 

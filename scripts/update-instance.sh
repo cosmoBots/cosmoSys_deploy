@@ -595,8 +595,8 @@ if [ "$notebook_preview_enabled" = true ] && ! deployment_compose exec -T redmin
   update_failed "The updated image does not provide a writable Notebook Preview runtime."
 fi
 if [ "$poris_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
-  "plugin = Redmine::Plugin.find(:cosmosys_poris); abort('cosmoSys PORIS plugin is not registered') unless plugin; root = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); abort('PORIS viewer bundle is missing') unless File.file?(root.join('prod.js')) && File.file?(root.join('style.css')) && File.file?(root.join('build-info.json'))"; then
-  update_failed "The updated image does not contain the PORIS plugin and viewer bundle."
+  "plugin = Redmine::Plugin.find(:cosmosys_poris); abort('cosmoSys PORIS plugin is not registered') unless plugin; root = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); bundle = root.join('prod.js'); abort('PORIS viewer bundle is missing') unless File.file?(bundle) && File.file?(root.join('style.css')) && File.file?(root.join('build-info.json')); abort('PORIS viewer bundle contains unresolved process.env references') if File.read(bundle).match?(/process\\.env(?:\\.NODE_ENV)?/)"; then
+  update_failed "The updated image does not contain a browser-ready PORIS viewer bundle. Rebuild it with cosmosys_poris/scripts/build_viewer.sh."
 fi
 
 cat <<EOF

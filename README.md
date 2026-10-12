@@ -178,7 +178,11 @@ before switching images. The isolated full-stack check is:
 Set `COSMOSYS_PORIS_ENABLED=true` to add the pinned `cosmosys_poris` plugin to
 the Requirements + Kroki + LaTeX + Notebook Preview stack. The plugin
 repository includes its prebuilt `porisViewer` bundle, so the image build does
-not need Node.js. For the current full validation stack, the instance
+not need Node.js. The workspace promotion script rebuilds that bundle from the
+`porisViewer` submodule before publishing `cosmosys_poris`; the plugin build,
+Docker build, isolated validation and instance update all reject unresolved
+`process.env` references so a Node-only bundle cannot be deployed. For the
+current full validation stack, the instance
 environment file should contain:
 
 ```dotenv
@@ -276,7 +280,7 @@ Current pins (see `.env.example` and `compose*.yml`):
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `7a98163` | n/a |
 | [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `9ae5de3` | n/a |
 | [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (optional) | 0.2.0 | `91aa27e` | `v0.2.0` |
-| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `ee8beb1` | n/a |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `1e953cf` | n/a |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
