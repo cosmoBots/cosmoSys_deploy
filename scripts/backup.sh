@@ -26,6 +26,7 @@ cosmosys_req_revision=
 if [ "$variant" = requirements ]; then
   cosmosys_req_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 fi
+cosmosys_poris_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-poris.revision)
 
 if [ "$cosmosys_revision" = unknown ]; then
   echo "Warning: the running Redmine image has no revision labels; rebuild it to record source revisions." >&2
@@ -67,6 +68,9 @@ deployment_compose exec -T redmine \
   echo "cosmosys_revision=$cosmosys_revision"
   if [ -n "$cosmosys_req_revision" ]; then
     echo "cosmosys_req_revision=$cosmosys_req_revision"
+  fi
+  if [ "$cosmosys_poris_revision" != unknown ]; then
+    echo "cosmosys_poris_revision=$cosmosys_poris_revision"
   fi
   echo "rspreadsheet_revision=$rspreadsheet_revision"
 } >"$temporary_directory/manifest.env"

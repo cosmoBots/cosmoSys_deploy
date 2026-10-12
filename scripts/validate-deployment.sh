@@ -4,9 +4,9 @@ set -eu
 variant=${1:-all}
 
 case "$variant" in
-  base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview) ;;
+  base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview|requirements-kroki-latex-notebook-preview-poris) ;;
   *)
-    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview]" >&2
+    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview|requirements-kroki-latex-notebook-preview-poris]" >&2
     exit 2
     ;;
 esac
@@ -18,6 +18,7 @@ validate_variant() {
   kroki_enabled=${2:-false}
   latex_enabled=${3:-false}
   notebook_preview_enabled=${4:-false}
+  poris_enabled=${5:-false}
   validation_project="csys_deploy_validation_${selected_variant}_$$"
   compose_files="-f $repository_dir/compose.yml"
   expected_plugins="cosmosys"
@@ -41,6 +42,10 @@ validate_variant() {
   if [ "$notebook_preview_enabled" = true ]; then
     compose_files="$compose_files -f $repository_dir/compose.requirements-kroki-latex-notebook-preview.yml"
     expected_plugins="$expected_plugins redmine_notebook_preview"
+  fi
+  if [ "$poris_enabled" = true ]; then
+    compose_files="$compose_files -f $repository_dir/compose.requirements-kroki-latex-notebook-preview-poris.yml"
+    expected_plugins="$expected_plugins cosmosys_poris"
   fi
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
@@ -72,6 +77,10 @@ validate_variant() {
 
   compose exec -T redmine bundle exec rails runner \
     "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"Missing plugins: #{missing.join(', ')}\") unless missing.empty?; abort('cosmosys_req unexpectedly loaded') if actual.include?('cosmosys_req') && !expected.include?('cosmosys_req')"
+  if [ "$poris_enabled" = true ]; then
+    compose exec -T redmine bundle exec rails runner \
+      "require 'json'; plugin = Redmine::Plugin.find(:cosmosys_poris); abort('cosmoSys PORIS plugin did not load') unless plugin; bundle = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer/prod.js'); abort('PORIS viewer bundle is missing') unless File.file?(bundle) && File.size(bundle) > 100_000; metadata_path = bundle.dirname.join('build-info.json'); abort('PORIS viewer bundle metadata is missing') unless File.file?(metadata_path); metadata = JSON.parse(File.read(metadata_path)); abort('PORIS viewer source revision is invalid') unless metadata.fetch('revision').match?(/\\A[0-9a-f]{40}\\z/)"
+  fi
   if [ "$kroki_enabled" = true ]; then
     compose exec -T redmine bundle exec rails runner \
       "abort('Kroki compatibility initializer not loaded') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); Setting.plugin_redmine_kroki = {'kroki_url' => 'http://kroki:8000'}; settings = Setting.plugin_redmine_kroki; abort('Kroki settings do not support symbol access') unless settings[:kroki_url] == 'http://kroki:8000'; abort('Kroki settings lost string access') unless settings['kroki_url'] == 'http://kroki:8000'; abort('cosmoSys Kroki report-export patch not loaded') unless Cosmosys::ItemsController.ancestors.include?(CosmosysKroki::ItemsControllerPatch); abort('cosmoSys Kroki macro patch not loaded') unless Redmine::WikiFormatting::Macros::Definitions.ancestors.include?(CosmosysKroki::MacroDefinitionsPatch)"
@@ -120,6 +129,8 @@ elif [ "$variant" = requirements-kroki-latex ]; then
   validate_variant requirements true true
 elif [ "$variant" = requirements-kroki-latex-notebook-preview ]; then
   validate_variant requirements true true true
+elif [ "$variant" = requirements-kroki-latex-notebook-preview-poris ]; then
+  validate_variant requirements true true true true
 else
   validate_variant "$variant"
 fi

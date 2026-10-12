@@ -117,6 +117,23 @@ deployment_notebook_preview_enabled() {
   esac
 }
 
+# PORIS is provisionally exposed only above the current complete validation
+# stack. That wiring constraint is temporary; the plugin itself needs cosmoSys,
+# not Requirements, Kroki, LaTeX or Notebook Preview.
+deployment_poris_enabled() {
+  poris_enabled_value=$(deployment_setting COSMOSYS_PORIS_ENABLED false) || return
+
+  case "$poris_enabled_value" in
+    true|false)
+      printf '%s\n' "$poris_enabled_value"
+      ;;
+    *)
+      echo "COSMOSYS_PORIS_ENABLED must be true or false" >&2
+      return 2
+      ;;
+  esac
+}
+
 # Prints a label of a container, or "unknown" when the image predates it.
 deployment_container_label() {
   label_value=$(docker inspect --format "{{index .Config.Labels \"$2\"}}" "$1")
@@ -137,6 +154,7 @@ deployment_compose() {
   kroki_enabled=$(deployment_kroki_enabled) || return
   latex_enabled=$(deployment_latex_enabled) || return
   notebook_preview_enabled=$(deployment_notebook_preview_enabled) || return
+  poris_enabled=$(deployment_poris_enabled) || return
 
   if [ "$latex_enabled" = true ] && { [ "$variant" != requirements ] || [ "$kroki_enabled" != true ]; }; then
     echo "COSMOSYS_LATEX_ENABLED is currently supported only with COSMOSYS_VARIANT=requirements and COSMOSYS_KROKI_ENABLED=true" >&2
@@ -144,6 +162,13 @@ deployment_compose() {
   fi
   if [ "$notebook_preview_enabled" = true ] && [ "$latex_enabled" != true ]; then
     echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED requires COSMOSYS_LATEX_ENABLED=true" >&2
+    return 2
+  fi
+  if [ "$poris_enabled" = true ] && {
+    [ "$variant" != requirements ] || [ "$kroki_enabled" != true ] ||
+    [ "$latex_enabled" != true ] || [ "$notebook_preview_enabled" != true ];
+  }; then
+    echo "COSMOSYS_PORIS_ENABLED is currently supported only on the full validation stack: Requirements + Kroki + LaTeX + Notebook Preview" >&2
     return 2
   fi
 
@@ -159,8 +184,11 @@ deployment_compose() {
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
   fi
 
-  # Add the highest stack's optional layers last in Compose merge order. The
-  # deployment is deliberately limited to this combination during evaluation.
+  # Add optional layers in reverse order because their arguments are prepended.
+  # PORIS currently tops the complete validation stack during evaluation.
+  if [ "$poris_enabled" = true ]; then
+    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex-notebook-preview-poris.yml" "$@"
+  fi
   if [ "$notebook_preview_enabled" = true ]; then
     set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex-notebook-preview.yml" "$@"
   fi

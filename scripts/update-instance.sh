@@ -87,6 +87,7 @@ database_mode=$(deployment_db_mode)
 kroki_enabled=$(deployment_kroki_enabled)
 latex_enabled=$(deployment_latex_enabled)
 notebook_preview_enabled=$(deployment_notebook_preview_enabled)
+poris_enabled=$(deployment_poris_enabled)
 update_mode=$(deployment_setting COSMOSYS_UPDATE_MODE manual)
 
 case "$update_mode" in
@@ -114,6 +115,7 @@ running_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.red
 running_cosmosys_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-kroki.revision)
 running_latex=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-cbots-latex.revision)
 running_notebook_preview=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-notebook-preview.revision)
+running_poris=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-poris.revision)
 
 # An instance provisioned before the variant was recorded runs the Requirements
 # image while its environment file says nothing, so it resolves to the base
@@ -144,6 +146,7 @@ if [ -n "$pins_file" ]; then
   declared_compose=$declared_env
   declared_requirements=$declared_env
   declared_notebook_preview_compose=$declared_env
+  declared_poris_compose=$declared_env
 else
   if ! git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
     echo "$deployment_repository_dir is not a git checkout, so the declared" >&2
@@ -178,6 +181,7 @@ else
   declared_compose=$(git -C "$deployment_repository_dir" show "$source_ref:compose.yml")
   declared_requirements=$(git -C "$deployment_repository_dir" show "$source_ref:compose.requirements.yml")
   declared_notebook_preview_compose=$(git -C "$deployment_repository_dir" show "$source_ref:compose.requirements-kroki-latex-notebook-preview.yml")
+  declared_poris_compose=$(git -C "$deployment_repository_dir" show "$source_ref:compose.requirements-kroki-latex-notebook-preview-poris.yml")
 
   # Everything that ends up inside the image, so that a stale checkout cannot
   # publish something else under the image tag that names those revisions.
@@ -185,6 +189,7 @@ else
     Dockerfile compose.yml compose.requirements.yml compose.kroki.yml \
     compose.requirements-kroki.yml compose.requirements-kroki-latex.yml \
     compose.requirements-kroki-latex-notebook-preview.yml \
+    compose.requirements-kroki-latex-notebook-preview-poris.yml \
     compose.shared-db.yml compose.proxy.yml \
     config bootstrap; then
     deployment_drift=no
@@ -199,6 +204,7 @@ declared_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMI
 declared_cosmosys_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_REVISION)
 declared_latex_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_LATEX_REVISION)
 declared_notebook_preview_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_NOTEBOOK_PREVIEW_REVISION)
+declared_poris_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_PORIS_REVISION)
 declared_rspreadsheet=$(printf '%s\n' "$declared_env" | declared_setting RSPREADSHEET_REVISION)
 declared_redmine_image=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_IMAGE)
 declared_postgres_image=$(printf '%s\n' "$declared_env" | declared_setting POSTGRES_IMAGE)
@@ -209,6 +215,8 @@ declared_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSM
 declared_req_kroki_latex_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_IMAGE)
 declared_req_kroki_latex_notebook_preview_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)
 declared_req_kroki_latex_notebook_preview_image=${declared_req_kroki_latex_notebook_preview_image:-$(printf '%s\n' "$declared_notebook_preview_compose" | declared_compose_image COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)}
+declared_req_kroki_latex_notebook_preview_poris_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE)
+declared_req_kroki_latex_notebook_preview_poris_image=${declared_req_kroki_latex_notebook_preview_poris_image:-$(printf '%s\n' "$declared_poris_compose" | declared_compose_image COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE)}
 
 if [ -n "$pins_file" ]; then
   # A pins file may name the image explicitly instead of relying on Compose.
@@ -217,11 +225,13 @@ if [ -n "$pins_file" ]; then
   pins_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
   pins_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
   pins_req_kroki_latex_notebook_preview_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)
+  pins_req_kroki_latex_notebook_preview_poris_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE)
   declared_image=${pins_image:-$declared_image}
   declared_req_image=${pins_req_image:-$declared_req_image}
   declared_kroki_image=${pins_kroki_image:-$declared_kroki_image}
   declared_req_kroki_image=${pins_req_kroki_image:-$declared_req_kroki_image}
   declared_req_kroki_latex_notebook_preview_image=${pins_req_kroki_latex_notebook_preview_image:-$declared_req_kroki_latex_notebook_preview_image}
+  declared_req_kroki_latex_notebook_preview_poris_image=${pins_req_kroki_latex_notebook_preview_poris_image:-$declared_req_kroki_latex_notebook_preview_poris_image}
 fi
 
 declared_effective_image=$declared_image
@@ -266,6 +276,14 @@ if [ "$notebook_preview_enabled" = true ]; then
   declared_effective_req_image=$declared_req_kroki_latex_notebook_preview_image
 fi
 
+if [ "$poris_enabled" = true ]; then
+  if [ "$notebook_preview_enabled" != true ] || [ -z "$declared_poris_revision" ] || [ -z "$declared_req_kroki_latex_notebook_preview_poris_image" ]; then
+    echo "PORIS is enabled, but its source revision or full-stack image is not declared." >&2
+    exit 2
+  fi
+  declared_effective_req_image=$declared_req_kroki_latex_notebook_preview_poris_image
+fi
+
 if [ "$variant" = requirements ]; then
   declared_reference=$declared_effective_req_image
 else
@@ -302,6 +320,10 @@ fi
 if [ "$notebook_preview_enabled" = true ]; then
   printf '          Redmine Notebook Preview %s\n' "$running_notebook_preview"
   printf 'Declared: Redmine Notebook Preview %s\n' "$declared_notebook_preview_revision"
+fi
+if [ "$poris_enabled" = true ]; then
+  printf '          cosmoSys PORIS %s\n' "$running_poris"
+  printf 'Declared: cosmoSys PORIS %s\n' "$declared_poris_revision"
 fi
 
 if [ "$deployment_drift" = yes ]; then
@@ -465,6 +487,10 @@ if [ "$notebook_preview_enabled" = true ]; then
   set_instance_setting REDMINE_NOTEBOOK_PREVIEW_REVISION "$declared_notebook_preview_revision"
   set_instance_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE "$declared_req_kroki_latex_notebook_preview_image"
 fi
+if [ "$poris_enabled" = true ]; then
+  set_instance_setting COSMOSYS_PORIS_REVISION "$declared_poris_revision"
+  set_instance_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE "$declared_req_kroki_latex_notebook_preview_poris_image"
+fi
 if [ "$variant" = requirements ]; then
   set_instance_setting COSMOSYS_REQ_REVISION "$declared_cosmosys_req"
   set_instance_setting COSMOSYS_REQ_IMAGE "$declared_req_image"
@@ -529,6 +555,12 @@ if [ "$notebook_preview_enabled" = true ]; then
     update_failed "The instance runs Redmine Notebook Preview $updated_notebook_preview instead of $declared_notebook_preview_revision."
   fi
 fi
+if [ "$poris_enabled" = true ]; then
+  updated_poris=$(deployment_container_label "$updated_container" eu.cosmobots.cosmosys-poris.revision)
+  if [ "$updated_poris" != "$declared_poris_revision" ]; then
+    update_failed "The instance runs cosmoSys PORIS $updated_poris instead of $declared_poris_revision."
+  fi
+fi
 
 expected_plugins=cosmosys
 if [ "$variant" = requirements ]; then
@@ -542,6 +574,9 @@ if [ "$latex_enabled" = true ]; then
 fi
 if [ "$notebook_preview_enabled" = true ]; then
   expected_plugins="$expected_plugins redmine_notebook_preview"
+fi
+if [ "$poris_enabled" = true ]; then
+  expected_plugins="$expected_plugins cosmosys_poris"
 fi
 if ! deployment_compose exec -T redmine bundle exec rails runner \
   "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"missing plugins: #{missing.join(', ')}\") unless missing.empty?"; then
@@ -558,6 +593,10 @@ fi
 if [ "$notebook_preview_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
   "settings = Setting.plugin_redmine_notebook_preview; abort('Jupyter is not executable') unless File.executable?(settings.fetch('jupyter_bin')); cache = settings.fetch('cache_dir'); abort('Notebook cache is not writable') unless File.directory?(cache) && File.writable?(cache)"; then
   update_failed "The updated image does not provide a writable Notebook Preview runtime."
+fi
+if [ "$poris_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
+  "plugin = Redmine::Plugin.find(:cosmosys_poris); abort('cosmoSys PORIS plugin is not registered') unless plugin; root = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); abort('PORIS viewer bundle is missing') unless File.file?(root.join('prod.js')) && File.file?(root.join('style.css')) && File.file?(root.join('build-info.json'))"; then
+  update_failed "The updated image does not contain the PORIS plugin and viewer bundle."
 fi
 
 cat <<EOF

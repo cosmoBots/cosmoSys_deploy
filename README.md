@@ -168,6 +168,36 @@ before switching images. The isolated full-stack check is:
 ./scripts/validate-deployment.sh requirements-kroki-latex-notebook-preview
 ```
 
+### PORIS
+
+> **EXPERIMENTAL:** PORIS is enabled only on top of the current complete plugin
+> validation stack. This deployment constraint is provisional and does not
+> mean the `cosmosys_poris` plugin depends on Requirements, Kroki, LaTeX or
+> Notebook Preview.
+
+Set `COSMOSYS_PORIS_ENABLED=true` to add the pinned `cosmosys_poris` plugin to
+the Requirements + Kroki + LaTeX + Notebook Preview stack. The plugin
+repository includes its prebuilt `porisViewer` bundle, so the image build does
+not need Node.js. For the current full validation stack, the instance
+environment file should contain:
+
+```dotenv
+COSMOSYS_VARIANT=requirements
+COSMOSYS_KROKI_ENABLED=true
+COSMOSYS_LATEX_ENABLED=true
+COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true
+COSMOSYS_PORIS_ENABLED=true
+```
+
+The wrapper selects the PORIS overlay last, extending the whole stack rather
+than replacing any existing plugin layer. The isolated check is:
+
+```sh
+./scripts/validate-deployment.sh requirements-kroki-latex-notebook-preview-poris
+```
+
+PORIS remains opt-in and disabled by default.
+
 The Compose wrapper then adds the appropriate Kroki overlays automatically. The
 Redmine image is built with the pinned `redmine_kroki` and `cosmosys_kroki`
 plugins, while Kroki itself runs as a separate service with its official
@@ -246,6 +276,7 @@ Current pins (see `.env.example` and `compose*.yml`):
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `7a98163` | n/a |
 | [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `9ae5de3` | n/a |
 | [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (optional) | 0.2.0 | `91aa27e` | `v0.2.0` |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `0607a6f` | n/a |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds

@@ -159,3 +159,18 @@ RUN bundle install \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
 LABEL eu.cosmobots.redmine-notebook-preview.revision="${REDMINE_NOTEBOOK_PREVIEW_REVISION}"
+
+FROM cosmosys_requirements_kroki_latex_notebook_preview AS cosmosys_requirements_kroki_latex_notebook_preview_poris
+
+ARG COSMOSYS_PORIS_REVISION
+
+RUN : "${COSMOSYS_PORIS_REVISION:?Pass COSMOSYS_PORIS_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_poris.git /tmp/cosmosys_poris \
+    && git -C /tmp/cosmosys_poris checkout "${COSMOSYS_PORIS_REVISION}" \
+    && test "$(git -C /tmp/cosmosys_poris rev-parse HEAD)" = "${COSMOSYS_PORIS_REVISION}" \
+    && cp -a /tmp/cosmosys_poris plugins/cosmosys_poris \
+    && rm -rf /tmp/cosmosys_poris/.git \
+    && bundle install \
+    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+
+LABEL eu.cosmobots.cosmosys-poris.revision="${COSMOSYS_PORIS_REVISION}"

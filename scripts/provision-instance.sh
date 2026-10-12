@@ -7,7 +7,7 @@ proxy_env=${COSMOSYS_PROXY_ENV_FILE:-"$root_dir/proxy/.env"}
 
 usage() {
   cat >&2 <<EOF
-Usage: $0 [--variant base|requirements] [--kroki] [--latex] [--notebook-preview] [--http-port PORT]
+Usage: $0 [--variant base|requirements] [--kroki] [--latex] [--notebook-preview] [--poris] [--http-port PORT]
        [--hostname HOST [--tls EMAIL|internal]]
        INSTANCE_NAME INSTANCE_ENV_FILE
 
@@ -17,6 +17,8 @@ NOTE: --latex enables an experimental deployment integration for Requirements + 
       LaTeX works; this wiring is provisional pending a more modular strategy by Iván.
 NOTE: --notebook-preview enables an experimental Jupyter notebook preview.
       It requires --latex and currently uses the full Requirements + Kroki stack.
+NOTE: --poris enables the experimental PORIS plugin on top of the complete
+      Requirements + Kroki + LaTeX + Notebook Preview validation stack.
 
 Creates the instance role and database on the shared PostgreSQL server and
 writes a new environment file for the instance. --variant records which
@@ -31,6 +33,7 @@ variant=base
 kroki_enabled=false
 latex_enabled=false
 notebook_preview_enabled=false
+poris_enabled=false
 http_port=0
 public_host=
 proxy_tls=
@@ -46,6 +49,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --notebook-preview)
       notebook_preview_enabled=true
+      shift
+      ;;
+    --poris)
+      poris_enabled=true
       shift
       ;;
     --variant|--http-port|--hostname|--tls)
@@ -113,6 +120,13 @@ if [ "$latex_enabled" = true ] && { [ "$variant" != requirements ] || [ "$kroki_
 fi
 if [ "$notebook_preview_enabled" = true ] && [ "$latex_enabled" != true ]; then
   echo "--notebook-preview requires --latex" >&2
+  exit 2
+fi
+if [ "$poris_enabled" = true ] && {
+  [ "$variant" != requirements ] || [ "$kroki_enabled" != true ] ||
+  [ "$latex_enabled" != true ] || [ "$notebook_preview_enabled" != true ];
+}; then
+  echo "--poris currently requires --variant requirements --kroki --latex --notebook-preview" >&2
   exit 2
 fi
 case "$http_port" in
@@ -213,6 +227,8 @@ umask 077
   echo "COSMOSYS_LATEX_ENABLED=$latex_enabled"
   echo "# EXPERIMENTAL: Notebook Preview is provisional and requires LaTeX in this deployment."
   echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=$notebook_preview_enabled"
+  echo "# EXPERIMENTAL: PORIS is currently available only on the complete validation stack."
+  echo "COSMOSYS_PORIS_ENABLED=$poris_enabled"
   echo "COSMOSYS_DB_MODE=shared"
   echo "COSMOSYS_DB_HOST=$db_host"
   echo "COSMOSYS_DB_NETWORK=$db_network"
@@ -260,13 +276,16 @@ fi
 if [ "$notebook_preview_enabled" = true ]; then
   compose_files="$compose_files -f compose.requirements-kroki-latex-notebook-preview.yml"
 fi
+if [ "$poris_enabled" = true ]; then
+  compose_files="$compose_files -f compose.requirements-kroki-latex-notebook-preview-poris.yml"
+fi
 compose_files="$compose_files -f compose.shared-db.yml"
 if [ -n "$public_host" ]; then
   compose_files="$compose_files -f compose.proxy.yml"
 fi
 
   cat <<EOF
-Provisioned $role on the shared PostgreSQL server, $variant variant, Kroki $kroki_enabled, LaTeX $latex_enabled, Notebook Preview $notebook_preview_enabled.
+Provisioned $role on the shared PostgreSQL server, $variant variant, Kroki $kroki_enabled, LaTeX $latex_enabled, Notebook Preview $notebook_preview_enabled, PORIS $poris_enabled.
 Instance environment file: $instance_env
 
 From $root_dir, start the instance with the wrapper, which resolves the
