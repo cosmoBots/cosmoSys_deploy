@@ -98,6 +98,16 @@ expected_req_image=$(sh scripts/image-tag.sh requirements)
 if [ "$(deployment_declared_image requirements)" != "$expected_req_image" ]; then
   error "compose.requirements.yml: COSMOSYS_REQ_IMAGE should default to $expected_req_image for this content"
 fi
+# The table of the README names every pinned commit.
+pins_table=$(sed -n '/^<!-- pins:start -->$/,/^<!-- pins:end -->$/p' README.md)
+for revision in "$(declared COSMOSYS_REVISION)" "$(declared COSMOSYS_REQ_REVISION)" "$(declared RSPREADSHEET_REVISION)" \
+  $(for plugin in $(catalog_all_plugins "$catalog"); do catalog_value "$catalog" "PLUGIN_${plugin}_REVISION"; done); do
+  case "$pins_table" in
+    *"\`$(printf '%.7s' "$revision")\`"*) ;;
+    *) error "README.md: the pins table does not list $(printf '%.7s' "$revision"); run scripts/update-pins.sh" ;;
+  esac
+done
+
 untracked=$(git ls-files --others --exclude-standard -- Dockerfile plugins.conf config bootstrap kroki_compat docker scripts/catalog-lib.sh 2>/dev/null || true)
 if [ -n "$untracked" ]; then
   echo "Warning: untracked files would end up in the image without changing its name:" >&2

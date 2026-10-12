@@ -122,6 +122,15 @@ catalog_tool_packages() {
   catalog_unique "$catalog_tool_packages_all"
 }
 
+# Prints the tool groups of a list that install Python packages.
+catalog_python_groups() {
+  for catalog_python_group in $2; do
+    if [ -n "$(catalog_value "$1" "TOOLS_${catalog_python_group}_PYTHON")" ]; then
+      printf '%s\n' "$catalog_python_group"
+    fi
+  done
+}
+
 # Joins the lines on standard input with SEPARATOR.
 catalog_join() {
   paste -sd "$1" -
