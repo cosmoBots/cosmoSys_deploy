@@ -78,11 +78,11 @@ deployment_catalog="$deployment_repository_dir/plugins.conf"
 # COSMOSYS_PLUGINS instead, because those switches also chose images that no
 # longer exist.
 deployment_plugins() {
-  for legacy_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED; do
+  for legacy_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED COSMOSYS_NOTEBOOK_PREVIEW_ENABLED; do
     legacy_value=$(deployment_setting "$legacy_setting" false) || return
     if [ "$legacy_value" = true ]; then
       echo "$legacy_setting=true belongs to the previous way of enabling optional plugins." >&2
-      echo "List the set in COSMOSYS_PLUGINS instead (kroki, latex) and remove the old" >&2
+      echo "List the set in COSMOSYS_PLUGINS instead (kroki, latex, notebooks) and remove the old" >&2
       echo "switches, then run scripts/update-instance.sh to rebuild the instance." >&2
       return 2
     fi

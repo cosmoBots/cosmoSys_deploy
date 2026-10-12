@@ -69,7 +69,15 @@ FROM cosmosys_${COSMOSYS_VARIANT} AS cosmosys
 ARG COSMOSYS_TOOLS=
 
 COPY docker/install-tools.sh /opt/cosmosys-deploy/
+COPY docker/python /opt/cosmosys-deploy/python
 RUN sh /opt/cosmosys-deploy/install-tools.sh "${COSMOSYS_TOOLS}"
+
+# Where the plugins that use Python tools find them: the LaTeX plugin renders
+# formulas with this interpreter, and the notebook viewer runs this jupyter and
+# takes the interpreter next to it for the formulas of a notebook.
+ENV LATEX_PYTHON_BIN=/opt/cosmosys-python/bin/python \
+    JUPYTER_BIN=/opt/cosmosys-python/bin/jupyter \
+    NOTEBOOK_CACHE_DIR=/usr/src/redmine/tmp/notebook_cache
 
 COPY docker/cosmosys-entrypoint.sh /opt/cosmosys-deploy/
 

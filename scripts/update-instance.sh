@@ -130,8 +130,8 @@ running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmob
 running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 
 # The plugin sets the container was started with. Images built before
-# plugins.conf have no tools label; they carried Kroki and LaTeX inside and
-# say so in labels of their own.
+# plugins.conf have no tools label; they carried Kroki, LaTeX and the notebook
+# viewer inside and say so in labels of their own.
 if [ "$(docker inspect --format '{{index .Config.Labels "eu.cosmobots.tools"}}' "$redmine_container")" = '<no value>' ]; then
   running_plugins=
   if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)" != unknown ]; then
@@ -139,6 +139,9 @@ if [ "$(docker inspect --format '{{index .Config.Labels "eu.cosmobots.tools"}}' 
   fi
   if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-cbots-latex.revision)" != unknown ]; then
     running_plugins="$running_plugins,latex"
+  fi
+  if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-notebook-preview.revision)" != unknown ]; then
+    running_plugins="$running_plugins,notebooks"
   fi
 else
   running_plugins=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$redmine_container" |
@@ -491,8 +494,11 @@ for pinned_setting in $(catalog_option_pins "$deployment_catalog" "$(printf '%s'
 done
 # Settings of the time when each optional plugin had an image of its own.
 for obsolete_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED \
-  REDMINE_KROKI_REVISION COSMOSYS_KROKI_REVISION COSMOSYS_LATEX_REVISION \
-  COSMOSYS_KROKI_IMAGE COSMOSYS_REQ_KROKI_IMAGE COSMOSYS_REQ_KROKI_LATEX_IMAGE; do
+  COSMOSYS_NOTEBOOK_PREVIEW_ENABLED REDMINE_KROKI_REVISION \
+  COSMOSYS_KROKI_REVISION COSMOSYS_LATEX_REVISION \
+  REDMINE_NOTEBOOK_PREVIEW_REVISION COSMOSYS_KROKI_IMAGE \
+  COSMOSYS_REQ_KROKI_IMAGE COSMOSYS_REQ_KROKI_LATEX_IMAGE \
+  COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE; do
   remove_instance_setting "$obsolete_setting"
 done
 
@@ -557,10 +563,18 @@ case ",$target_plugins," in
     ;;
 esac
 case ",$target_plugins," in
-  *,latex,*)
+  *,latex,*|*,notebooks,*)
     if ! deployment_compose exec -T redmine bundle exec rails runner \
-    "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"; then
+    "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); python = Setting.plugin_redmine_cbots_latex['python_bin'].presence || '/usr/bin/python3'; abort(\"matplotlib is unavailable to #{python}; the LaTeX plugin settings should name #{ENV['LATEX_PYTHON_BIN']}\") unless system(python, '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"; then
       update_failed "The updated image does not provide static LaTeX rendering."
+    fi
+    ;;
+esac
+case ",$target_plugins," in
+  *,notebooks,*)
+    if ! deployment_compose exec -T redmine bundle exec rails runner \
+    "require 'open3'; require 'json'; settings = Setting.plugin_redmine_notebook_preview; jupyter = settings['jupyter_bin']; abort(\"#{jupyter} is not executable; the notebook preview settings should name #{ENV['JUPYTER_BIN']}\") unless File.executable?(jupyter.to_s); abort('matplotlib is unavailable next to jupyter') unless system(File.join(File.dirname(jupyter), 'python'), '-c', 'import matplotlib', out: File::NULL, err: File::NULL); notebook = JSON.generate('cells' => [{'cell_type' => 'markdown', 'metadata' => {}, 'source' => ['Notebook preview check']}], 'metadata' => {}, 'nbformat' => 4, 'nbformat_minor' => 5); html, error, status = Open3.capture3(jupyter, 'nbconvert', '--to', 'html', '--template', 'basic', '--stdin', '--stdout', stdin_data: notebook); abort(\"nbconvert failed: #{error}\") unless status.success? && html.include?('Notebook preview check')"; then
+      update_failed "The updated image does not convert notebooks."
     fi
     ;;
 esac

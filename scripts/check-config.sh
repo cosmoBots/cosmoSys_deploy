@@ -55,9 +55,22 @@ for option in $(catalog_value "$catalog" COSMOSYS_OPTIONS); do
   done
 done
 for tool in $known_tools; do
-  if [ -z "$(catalog_value "$catalog" "TOOLS_${tool}_APT")" ]; then
+  python_packages=$(catalog_value "$catalog" "TOOLS_${tool}_PYTHON")
+  if [ -z "$(catalog_value "$catalog" "TOOLS_${tool}_APT")$python_packages" ]; then
     error "plugins.conf: tool group $tool lists no packages"
   fi
+  [ -n "$python_packages" ] || continue
+  lock="docker/python/$tool.txt"
+  if [ ! -f "$lock" ]; then
+    error "plugins.conf: tool group $tool has no $lock; run scripts/update-pins.sh --python"
+    continue
+  fi
+  for package in $python_packages; do
+    normalized=$(printf '%s' "$package" | tr 'A-Z_.' 'a-z--')
+    if ! grep -q "^$normalized==" "$lock"; then
+      error "$lock does not pin $package; run scripts/update-pins.sh --python"
+    fi
+  done
 done
 for plugin in $(catalog_all_plugins "$catalog"); do
   local_dir=$(catalog_value "$catalog" "PLUGIN_${plugin}_LOCAL")

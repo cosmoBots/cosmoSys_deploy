@@ -17,8 +17,9 @@ Creates the instance role and database on the shared PostgreSQL server and
 writes a new environment file for the instance. --variant records which
 deployment variant the instance runs, so the scripts add
 compose.requirements.yml by themselves. --plugins lists the optional plugin
-sets of plugins.conf the instance activates, such as kroki or latex; --kroki
-and --latex are shorthands for them. With --hostname the instance is also
+sets of plugins.conf the instance activates, such as kroki or latex; --kroki,
+--latex and --notebook-preview are shorthands for kroki, latex and notebooks.
+With --hostname the instance is also
 published through the shared reverse proxy; --tls defaults to
 COSMOSYS_PROXY_TLS from the shell or proxy/.env.
 EOF
@@ -33,6 +34,10 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --kroki|--latex)
       plugins_setting="$plugins_setting ${1#--}"
+      shift
+      ;;
+    --notebook-preview)
+      plugins_setting="$plugins_setting notebooks"
       shift
       ;;
     --variant|--plugins|--http-port|--hostname|--tls)

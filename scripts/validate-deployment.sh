@@ -20,7 +20,8 @@ unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_INITIAL_ADMIN_PASSWORD COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE \
   COSMOSYS_HTTP_PORT COSMOSYS_DB_MODE COSMOSYS_PROXY_MODE COSMOSYS_VARIANT \
   COSMOSYS_PLUGINS COSMOSYS_TOOLS COSMOSYS_IMAGE COSMOSYS_REQ_IMAGE \
-  COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED COMPOSE_PROJECT_NAME
+  COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED COSMOSYS_NOTEBOOK_PREVIEW_ENABLED \
+  COMPOSE_PROJECT_NAME
 
 validation_directory=$(mktemp -d)
 trap 'rm -rf "$validation_directory"' EXIT
@@ -52,10 +53,14 @@ validate_case() {
     esac
   done
   absent_packages=
+  absent_python_packages=
   for tool in $(catalog_value "$deployment_catalog" COSMOSYS_TOOL_GROUPS); do
     case ",$tools," in
       *",$tool,"*) ;;
-      *) absent_packages="$absent_packages $(catalog_value "$deployment_catalog" "TOOLS_${tool}_APT")" ;;
+      *)
+        absent_packages="$absent_packages $(catalog_value "$deployment_catalog" "TOOLS_${tool}_APT")"
+        absent_python_packages="$absent_python_packages $(catalog_value "$deployment_catalog" "TOOLS_${tool}_PYTHON")"
+        ;;
     esac
   done
 
@@ -124,6 +129,20 @@ EOF
       return 1
     fi
   done
+  if [ -z "$tools" ] && compose exec -T redmine test -e /opt/cosmosys-python; then
+    echo "$description carries /opt/cosmosys-python, which none of its plugin sets needs." >&2
+    return 1
+  fi
+  for package in $absent_python_packages; do
+    if compose exec -T redmine /opt/cosmosys-python/bin/pip show "$package" >/dev/null 2>&1; then
+      echo "$description carries the Python package $package, which none of its plugin sets needs." >&2
+      return 1
+    fi
+  done
+  compose exec -T redmine sh -c 'test ! -e /opt/cosmosys-python || /opt/cosmosys-python/bin/pip check' >/dev/null
+
+  # Every migration of every registered plugin is applied.
+  runner "Redmine::Plugin.all.each { |plugin| migrations = Dir.glob(File.join(plugin.directory, 'db', 'migrate', '*.rb')).size; next if migrations.zero?; applied = ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin.id}'\").to_i; abort(\"#{plugin.id}: #{applied} of #{migrations} migrations applied\") unless applied == migrations }"
 
   case ",$plugins," in
     *,kroki,*)
@@ -132,8 +151,21 @@ EOF
       ;;
   esac
   case ",$plugins," in
-    *,latex,*)
-      runner "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"
+    *,latex,*|*,notebooks,*)
+      runner "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); python = Setting.plugin_redmine_cbots_latex['python_bin']; abort(\"LaTeX uses #{python}, not #{ENV['LATEX_PYTHON_BIN']}\") unless python == ENV['LATEX_PYTHON_BIN']; abort('matplotlib is unavailable') unless system(python, '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"
+      ;;
+  esac
+  case ",$plugins," in
+    *,notebooks,*)
+      # A notebook with a markdown formula and a plotted image goes through
+      # the viewer as an attachment would: converted for the page, then
+      # prepared for a static export, where the formula becomes an image.
+      runner "require 'json'; pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; notebook = {'cells' => [{'cell_type' => 'markdown', 'metadata' => {}, 'source' => ['Deploy check \$x^2\$']}, {'cell_type' => 'code', 'execution_count' => 1, 'metadata' => {}, 'source' => ['plot()'], 'outputs' => [{'output_type' => 'display_data', 'metadata' => {}, 'data' => {'image/png' => pixel, 'text/plain' => ['<Figure>']}}]}], 'metadata' => {'language_info' => {'name' => 'python'}}, 'nbformat' => 4, 'nbformat_minor' => 5}; settings = Setting.plugin_redmine_notebook_preview; abort(\"the viewer runs #{settings['jupyter_bin']}, not #{ENV['JUPYTER_BIN']}\") unless settings['jupyter_bin'] == ENV['JUPYTER_BIN']; attachment = Attachment.new(file: JSON.generate(notebook), filename: 'deploy-check.ipynb', author: User.where(admin: true).first); attachment.save!; service = RedmineNotebookPreview::NbconvertService; status = service.convert(attachment); abort(\"conversion failed: #{service.cached_error(attachment.id)}\") unless status == :ok; html = service.cached_html(attachment.id).to_s; abort('the preview lacks the text or the plotted image') unless html.include?('Deploy check') && html.include?('data:image/png'); exported = service.prepare_for_export(html); abort('the formula was not turned into an image for export') unless exported.scan('data:image/png').size > html.scan('data:image/png').size; attachment.destroy"
+      ;;
+  esac
+  case ",$plugins," in
+    *,tags,*)
+      runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); page.tag_list = 'deploy-check'; page.save!; abort('the tag was not stored') unless WikiPage.find(page.id).tag_list.include?('deploy-check'); abort('the tagged page is not found by its tag') unless WikiPage.tagged_with('deploy-check').exists?(page.id); abort('no tag in the tags table') unless AdditionalTag.where(name: 'deploy-check').exists?"
       ;;
   esac
 

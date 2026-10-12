@@ -442,17 +442,6 @@ if [ "$(running_plugin_sets)" != "$tool_set" ] || [ "$(instance_setting COSMOSYS
   exit 1
 fi
 
-echo "Checking that a plugin with migrations is not turned off without consent..."
-guarded_plugin=$(catalog_option_plugins "$deployment_catalog" "$tool_set" | head -n 1)
-instance_runner "ActiveRecord::Base.connection.execute(\"INSERT INTO schema_migrations (version) VALUES ('20990101000000-$guarded_plugin')\")"
-update_status=0
-update --pins "$validation_directory/target.env" --plugins '' >/dev/null 2>&1 || update_status=$?
-if [ "$update_status" -ne 3 ] || [ "$(running_plugin_sets)" != "$tool_set" ]; then
-  echo "Turning off a plugin with migrations returned $update_status instead of 3" >&2
-  exit 1
-fi
-instance_runner "ActiveRecord::Base.connection.execute(\"DELETE FROM schema_migrations WHERE version = '20990101000000-$guarded_plugin'\")"
-
 echo "Turning the $tool_set plugin set off again..."
 update --pins "$validation_directory/target.env" --plugins ''
 if [ -n "$(running_plugin_sets)" ] || [ -n "$(instance_setting COSMOSYS_TOOLS)" ] ||
@@ -460,6 +449,53 @@ if [ -n "$(running_plugin_sets)" ] || [ -n "$(instance_setting COSMOSYS_TOOLS)" 
   echo "Turning $tool_set off did not bring the instance back to the plain image" >&2
   exit 1
 fi
+
+# A set whose plugins create tables: turned on, used, refused when turned off
+# without consent, turned off with it, and turned on again with its data.
+migration_set=$(for option in $(catalog_value "$deployment_catalog" COSMOSYS_OPTIONS); do
+  for plugin in $(catalog_option_plugins "$deployment_catalog" "$option"); do
+    if deployment_compose exec -T redmine sh -c "ls /opt/cosmosys/plugins-available/$plugin/db/migrate/*.rb" >/dev/null 2>&1; then
+      echo "$option"
+      break
+    fi
+  done
+done | head -n 1)
+echo "Activating the $migration_set plugin set, whose plugins have migrations..."
+update --pins "$validation_directory/target.env" --plugins "$migration_set"
+if [ "$(running_plugin_sets)" != "$migration_set" ]; then
+  echo "Activating $migration_set did not leave the instance on it" >&2
+  exit 1
+fi
+migrated_plugins=$(for plugin in $(catalog_option_plugins "$deployment_catalog" "$migration_set"); do
+  deployment_compose exec -T redmine sh -c "ls plugins/$plugin/db/migrate/*.rb" >/dev/null 2>&1 && echo "$plugin"
+done | catalog_join ' ')
+instance_runner "%w[$migrated_plugins].each { |plugin| abort(\"#{plugin} has no migration applied\") unless ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin}'\").to_i.positive? }"
+if [ "$migration_set" = tags ]; then
+  instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); page.tag_list = 'update-validation'; page.save!"
+fi
+
+echo "Checking that a plugin with migrations is not turned off without consent..."
+update_status=0
+update --pins "$validation_directory/target.env" --plugins '' >/dev/null 2>&1 || update_status=$?
+if [ "$update_status" -ne 3 ] || [ "$(running_plugin_sets)" != "$migration_set" ]; then
+  echo "Turning off a plugin with migrations returned $update_status instead of 3" >&2
+  exit 1
+fi
+
+echo "Turning the $migration_set plugin set off with consent..."
+update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal
+if [ -n "$(running_plugin_sets)" ]; then
+  echo "Turning $migration_set off with consent did not leave the instance without sets" >&2
+  exit 1
+fi
+instance_runner "%w[$migrated_plugins].each { |plugin| abort(\"the migrations of #{plugin} were undone\") unless ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin}'\").to_i.positive? }"
+
+echo "Turning the $migration_set plugin set on again..."
+update --pins "$validation_directory/target.env" --plugins "$migration_set"
+if [ "$migration_set" = tags ]; then
+  instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); abort('the tags did not come back') unless page.tag_list.include?('update-validation')"
+fi
+update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal >/dev/null
 
 echo "Checking that the switches from before plugins.conf are refused..."
 printf 'COSMOSYS_LATEX_ENABLED=true\n' >>"$COSMOSYS_ENV_FILE"
