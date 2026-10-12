@@ -1,5 +1,5 @@
 x-requirements-kroki-latex-notebook-preview-poris-redmine-image: &requirements-kroki-latex-notebook-preview-poris-image
-  image: ${COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE:-cosmobots/cosmosys-req-kroki-latex-notebook-preview-poris:af42cc4-6df0fce-489602a-7a98163-9ae5de3-91aa27e-0607a6f-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE:-cosmobots/cosmosys-req-kroki-latex-notebook-preview-poris:9b1e823-6df0fce-489602a-7a98163-9ae5de3-91aa27e-ee8beb1-redmine-7.0.1}
   build:
     target: cosmosys_requirements_kroki_latex_notebook_preview_poris
     args:
@@ -8,7 +8,7 @@ x-requirements-kroki-latex-notebook-preview-poris-redmine-image: &requirements-k
       COSMOSYS_KROKI_REVISION: ${COSMOSYS_KROKI_REVISION:-7a981637ba165cfcf331a826c5c8bc34d775d6ef}
       COSMOSYS_LATEX_REVISION: ${COSMOSYS_LATEX_REVISION:-9ae5de392a0795c1a4a5dca8afc1604f3412a6c8}
       REDMINE_NOTEBOOK_PREVIEW_REVISION: ${REDMINE_NOTEBOOK_PREVIEW_REVISION:-91aa27e8fa371944e092179a9a0127810091dc8a}
-      COSMOSYS_PORIS_REVISION: ${COSMOSYS_PORIS_REVISION:-0607a6ff97a0906f4567e192f216aee9406fbcf6}
+      COSMOSYS_PORIS_REVISION: ${COSMOSYS_PORIS_REVISION:-ee8beb1c5795a2359619d5425acbe183cf8f2e22}
 
 services:
   migrate:

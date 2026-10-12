@@ -1,5 +1,5 @@
 x-kroki-redmine-image: &kroki-redmine-image
-  image: ${COSMOSYS_KROKI_IMAGE:-cosmobots/cosmosys-kroki:af42cc4-489602a-7a98163-redmine-7.0.1}
+  image: ${COSMOSYS_KROKI_IMAGE:-cosmobots/cosmosys-kroki:9b1e823-489602a-7a98163-redmine-7.0.1}
   build:
     target: cosmosys_kroki
     args:
