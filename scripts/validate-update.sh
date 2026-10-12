@@ -14,7 +14,8 @@ unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_HTTP_PORT COSMOSYS_DB_MODE COSMOSYS_PROXY_MODE COSMOSYS_VARIANT \
   COSMOSYS_ENV_FILE COMPOSE_PROJECT_NAME COSMOSYS_COMPOSE_PROJECT \
   COSMOSYS_REVISION COSMOSYS_REQ_REVISION RSPREADSHEET_REVISION \
-  COSMOSYS_IMAGE COSMOSYS_REQ_IMAGE COSMOSYS_UPDATE_MODE
+  COSMOSYS_IMAGE COSMOSYS_REQ_IMAGE COSMOSYS_UPDATE_MODE \
+  COSMOSYS_PLUGINS COSMOSYS_TOOLS COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED
 
 suffix=$$
 validation_directory=$(mktemp -d)
@@ -72,7 +73,10 @@ cleanup() {
   docker image rm -f "$baseline_image" "$baseline_req_image" \
     "$target_image" "$target_req_image" \
     "cosmobots/cosmosys-update-validation:broken-$suffix" \
-    "cosmobots/cosmosys-req-update-validation:broken-$suffix" >/dev/null 2>&1 || true
+    "cosmobots/cosmosys-req-update-validation:broken-$suffix" \
+    "cosmosys-rollback/csys_update_validation_$suffix:previous" >/dev/null 2>&1 || true
+  docker image ls --format '{{.Repository}}:{{.Tag}}' |
+    grep -F "$target_req_image-" | xargs -r docker image rm -f >/dev/null 2>&1 || true
   rm -rf -- "$validation_directory"
 }
 trap cleanup EXIT HUP INT TERM
@@ -387,6 +391,85 @@ instance_runner "
   abort('the seeded user did not survive the failed update') unless
     User.find_by(login: 'update_validation')
 "
+
+# Optional plugin sets change as part of an update, with the same backup and
+# the same way back. The first set of the catalog that needs tools exercises
+# the last build stage too.
+tool_set=$(for option in $(catalog_value "$deployment_catalog" COSMOSYS_OPTIONS); do
+  [ -n "$(catalog_value "$deployment_catalog" "OPTION_${option}_TOOLS")" ] && echo "$option"
+done | head -n 1)
+tool_groups=$(catalog_option_tools "$deployment_catalog" "$tool_set" | catalog_join ,)
+running_plugin_sets() {
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$(deployment_compose ps -q redmine)" |
+    sed -n 's/^COSMOSYS_PLUGINS=//p' | tail -n 1
+}
+
+echo "Checking that a set with an unknown name is refused..."
+update_status=0
+update --check --pins "$validation_directory/target.env" --plugins nonexistent >/dev/null 2>&1 ||
+  update_status=$?
+if [ "$update_status" -ne 2 ]; then
+  echo "An unknown plugin set returned $update_status instead of 2" >&2
+  exit 1
+fi
+
+echo "Activating the $tool_set plugin set..."
+update --pins "$validation_directory/target.env" --plugins "$tool_set"
+if [ "$(running_plugin_sets)" != "$tool_set" ] ||
+  [ "$(instance_setting COSMOSYS_PLUGINS)" != "$tool_set" ] ||
+  [ "$(instance_setting COSMOSYS_TOOLS)" != "$tool_groups" ]; then
+  echo "Activating $tool_set did not leave the instance and its file on it" >&2
+  exit 1
+fi
+case "$(instance_setting COSMOSYS_REQ_IMAGE)" in
+  "$target_req_image-$(printf '%s' "$tool_groups" | tr ',' '.')") ;;
+  *)
+    echo "The image with the tools of $tool_set was not pinned" >&2
+    exit 1
+    ;;
+esac
+update --check --pins "$validation_directory/target.env"
+
+echo "Checking that a failed change of plugin sets goes back to the previous sets..."
+update_status=0
+update --pins "$validation_directory/broken.env" --plugins '' >/dev/null 2>&1 || update_status=$?
+if [ "$update_status" -ne 1 ]; then
+  echo "A failed change of plugin sets returned $update_status instead of 1" >&2
+  exit 1
+fi
+if [ "$(running_plugin_sets)" != "$tool_set" ] || [ "$(instance_setting COSMOSYS_PLUGINS)" != "$tool_set" ]; then
+  echo "A failed change of plugin sets did not go back to $tool_set" >&2
+  exit 1
+fi
+
+echo "Checking that a plugin with migrations is not turned off without consent..."
+guarded_plugin=$(catalog_option_plugins "$deployment_catalog" "$tool_set" | head -n 1)
+instance_runner "ActiveRecord::Base.connection.execute(\"INSERT INTO schema_migrations (version) VALUES ('20990101000000-$guarded_plugin')\")"
+update_status=0
+update --pins "$validation_directory/target.env" --plugins '' >/dev/null 2>&1 || update_status=$?
+if [ "$update_status" -ne 3 ] || [ "$(running_plugin_sets)" != "$tool_set" ]; then
+  echo "Turning off a plugin with migrations returned $update_status instead of 3" >&2
+  exit 1
+fi
+instance_runner "ActiveRecord::Base.connection.execute(\"DELETE FROM schema_migrations WHERE version = '20990101000000-$guarded_plugin'\")"
+
+echo "Turning the $tool_set plugin set off again..."
+update --pins "$validation_directory/target.env" --plugins ''
+if [ -n "$(running_plugin_sets)" ] || [ -n "$(instance_setting COSMOSYS_TOOLS)" ] ||
+  [ "$(instance_setting COSMOSYS_REQ_IMAGE)" != "$target_req_image" ]; then
+  echo "Turning $tool_set off did not bring the instance back to the plain image" >&2
+  exit 1
+fi
+
+echo "Checking that the switches from before plugins.conf are refused..."
+printf 'COSMOSYS_LATEX_ENABLED=true\n' >>"$COSMOSYS_ENV_FILE"
+update_status=0
+update --check --pins "$validation_directory/target.env" >/dev/null 2>&1 || update_status=$?
+set_instance_value COSMOSYS_LATEX_ENABLED false
+if [ "$update_status" -ne 2 ]; then
+  echo "An instance file with an old switch returned $update_status instead of 2" >&2
+  exit 1
+fi
 
 echo "Checking that an up-to-date instance reports nothing to do..."
 update --check --pins "$validation_directory/target.env"
