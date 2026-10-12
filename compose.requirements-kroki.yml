@@ -1,9 +1,9 @@
 x-requirements-kroki-redmine-image: &requirements-kroki-redmine-image
-  image: ${COSMOSYS_REQ_KROKI_IMAGE:-cosmobots/cosmosys-req-kroki:965eaf7-6df0fce-489602a-7a98163-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_KROKI_IMAGE:-cosmobots/cosmosys-req-kroki:965eaf7-d718a2c-489602a-7a98163-redmine-7.0.1}
   build:
     target: cosmosys_requirements_kroki
     args:
-      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-6df0fcedce83f60c04023b9e68e85c9048a2b916}
+      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-d718a2c0d64bdecd854aadd131e3b73d24002327}
       REDMINE_KROKI_REVISION: ${REDMINE_KROKI_REVISION:-489602ae50b5949a24004e072670a12a379730cf}
       COSMOSYS_KROKI_REVISION: ${COSMOSYS_KROKI_REVISION:-7a981637ba165cfcf331a826c5c8bc34d775d6ef}
 
