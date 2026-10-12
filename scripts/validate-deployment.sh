@@ -4,9 +4,9 @@ set -eu
 variant=${1:-all}
 
 case "$variant" in
-  base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex) ;;
+  base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview) ;;
   *)
-    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex]" >&2
+    echo "Usage: $0 [base|requirements|all|base-kroki|requirements-kroki|requirements-kroki-latex|requirements-kroki-latex-notebook-preview]" >&2
     exit 2
     ;;
 esac
@@ -17,6 +17,7 @@ validate_variant() {
   selected_variant=$1
   kroki_enabled=${2:-false}
   latex_enabled=${3:-false}
+  notebook_preview_enabled=${4:-false}
   validation_project="csys_deploy_validation_${selected_variant}_$$"
   compose_files="-f $repository_dir/compose.yml"
   expected_plugins="cosmosys"
@@ -36,6 +37,10 @@ validate_variant() {
   if [ "$latex_enabled" = true ]; then
     compose_files="$compose_files -f $repository_dir/compose.requirements-kroki-latex.yml"
     expected_plugins="$expected_plugins redmine_cbots_latex"
+  fi
+  if [ "$notebook_preview_enabled" = true ]; then
+    compose_files="$compose_files -f $repository_dir/compose.requirements-kroki-latex-notebook-preview.yml"
+    expected_plugins="$expected_plugins redmine_notebook_preview"
   fi
 
   export POSTGRES_PASSWORD="validation-database-password-$$"
@@ -77,6 +82,10 @@ validate_variant() {
     compose exec -T redmine bundle exec rails runner \
       "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"
   fi
+  if [ "$notebook_preview_enabled" = true ]; then
+    compose exec -T redmine bundle exec rails runner \
+      "require 'open3'; require 'json'; settings = Setting.plugin_redmine_notebook_preview; jupyter = settings.fetch('jupyter_bin'); cache = settings.fetch('cache_dir'); abort('Jupyter is not executable') unless File.executable?(jupyter); abort('Notebook cache is not writable') unless File.directory?(cache) && File.writable?(cache); notebook = JSON.generate({'cells' => [{'cell_type' => 'markdown', 'metadata' => {}, 'source' => ['Notebook Preview deploy smoke test']}], 'metadata' => {'kernelspec' => {'display_name' => 'Python 3', 'language' => 'python', 'name' => 'python3'}, 'language_info' => {'name' => 'python'}}, 'nbformat' => 4, 'nbformat_minor' => 5}); html, error, status = Open3.capture3({'PYTHONIOENCODING' => 'utf-8'}, jupyter, 'nbconvert', '--to', 'html', '--template', 'basic', '--stdin', '--stdout', stdin_data: notebook); abort(\"nbconvert failed: #{error}\") unless status.success? && html.include?('Notebook Preview deploy smoke test')"
+  fi
   compose exec -T redmine bundle exec rails runner \
     "public_help = Project.find_by(identifier: 'csys_help'); admin_help = Project.find_by(identifier: 'csys_admin_help'); abort('missing public help') unless public_help&.is_public?; abort('missing private admin help') unless admin_help && !admin_help.is_public?; abort('missing help pages') unless public_help.wiki.find_page('csInt_Overview', with_redirect: false) && public_help.wiki.find_page('Overview', with_redirect: false); abort('missing managed registry') unless Setting.where(name: 'cosmosys_managed_content_registry').exists?"
   compose exec -T redmine bundle exec rails runner \
@@ -109,6 +118,8 @@ elif [ "$variant" = requirements-kroki ]; then
   validate_variant requirements true
 elif [ "$variant" = requirements-kroki-latex ]; then
   validate_variant requirements true true
+elif [ "$variant" = requirements-kroki-latex-notebook-preview ]; then
+  validate_variant requirements true true true
 else
   validate_variant "$variant"
 fi

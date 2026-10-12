@@ -1,0 +1,20 @@
+x-requirements-kroki-latex-notebook-preview-redmine-image: &requirements-kroki-latex-notebook-preview-image
+  image: ${COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE:-cosmobots/cosmosys-req-kroki-latex-notebook-preview:af42cc4-6df0fce-489602a-7a98163-9ae5de3-91aa27e-redmine-7.0.1}
+  build:
+    target: cosmosys_requirements_kroki_latex_notebook_preview
+    args:
+      COSMOSYS_REQ_REVISION: ${COSMOSYS_REQ_REVISION:-6df0fcedce83f60c04023b9e68e85c9048a2b916}
+      REDMINE_KROKI_REVISION: ${REDMINE_KROKI_REVISION:-489602ae50b5949a24004e072670a12a379730cf}
+      COSMOSYS_KROKI_REVISION: ${COSMOSYS_KROKI_REVISION:-7a981637ba165cfcf331a826c5c8bc34d775d6ef}
+      COSMOSYS_LATEX_REVISION: ${COSMOSYS_LATEX_REVISION:-9ae5de392a0795c1a4a5dca8afc1604f3412a6c8}
+      REDMINE_NOTEBOOK_PREVIEW_REVISION: ${REDMINE_NOTEBOOK_PREVIEW_REVISION:-91aa27e8fa371944e092179a9a0127810091dc8a}
+
+services:
+  migrate:
+    <<: *requirements-kroki-latex-notebook-preview-image
+
+  bootstrap:
+    <<: *requirements-kroki-latex-notebook-preview-image
+
+  redmine:
+    <<: *requirements-kroki-latex-notebook-preview-image

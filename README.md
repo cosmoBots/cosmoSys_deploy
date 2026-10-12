@@ -122,8 +122,7 @@ COSMOSYS_KROKI_ENABLED=true
 LaTeX is also available as an experimental opt-in, currently on the highest
 stack (Requirements + Kroki) so it can be validated before the deployment is
 made more modular. The LaTeX plugin itself is independent of cosmoSys; its
-current deployment combination is only a validation step. Notebook Preview is
-not included and remains a later integration.
+current deployment combination is only a validation step.
 
 Enable both Kroki and LaTeX in an instance environment file:
 
@@ -136,6 +135,38 @@ COSMOSYS_LATEX_ENABLED=true
 > **EXPERIMENTAL:** LaTeX works, but this deployment wiring is provisional
 > until Iván integrates it into a more modular deployment strategy. It is
 > currently supported only with Requirements + Kroki.
+
+### Jupyter Notebook Preview
+
+> **EXPERIMENTAL:** Notebook Preview is available for evaluation, not yet a
+> settled deployment feature. Its wiring is provisional pending a more modular
+> deployment strategy.
+
+The optional `redmine_notebook_preview` plugin renders attached `.ipynb`
+notebooks inline through `nbconvert`; it does not execute notebook cells. It
+has a hard dependency on `redmine_cbots_latex`, so this deployment currently
+allows it only on the full Requirements + Kroki + LaTeX stack. This is a
+temporary deployment constraint, not a dependency on cosmoSys or Kroki in the
+plugin itself.
+
+To enable the complete validation stack in an instance environment file:
+
+```dotenv
+COSMOSYS_VARIANT=requirements
+COSMOSYS_KROKI_ENABLED=true
+COSMOSYS_LATEX_ENABLED=true
+COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true
+```
+
+Notebook Preview is disabled by default. Its source revision is pinned in
+`REDMINE_NOTEBOOK_PREVIEW_REVISION`; the image also installs `nbconvert` and
+creates a Redmine-writable preview cache. Use the normal
+`scripts/update-instance.sh` flow for an existing instance so a backup is taken
+before switching images. The isolated full-stack check is:
+
+```sh
+./scripts/validate-deployment.sh requirements-kroki-latex-notebook-preview
+```
 
 The Compose wrapper then adds the appropriate Kroki overlays automatically. The
 Redmine image is built with the pinned `redmine_kroki` and `cosmosys_kroki`
@@ -214,6 +245,7 @@ Current pins (see `.env.example` and `compose*.yml`):
 | [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (fork version fix) | `489602a` | none |
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `7a98163` | n/a |
 | [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `9ae5de3` | n/a |
+| [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (optional) | 0.2.0 | `91aa27e` | `v0.2.0` |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
@@ -230,6 +262,12 @@ Setting `COSMOSYS_LATEX_ENABLED=true` currently requires the requirements
 variant and Kroki. It adds `redmine_cbots_latex` and `python3-matplotlib` to
 that image for static formula rendering; this is the highest-stack validation
 path, not a permanent dependency on cosmoSys or Kroki.
+
+Setting `COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true` additionally requires
+`COSMOSYS_LATEX_ENABLED=true`. It adds the pinned Notebook Preview plugin and
+an isolated Python environment with `nbconvert`, `nbformat`, `jupyter_core`,
+and `matplotlib`, plus a writable cache directory. The plugin's
+`redmine_cbots_latex` dependency is required at Redmine startup.
 
 **Versioning strategy.** The plugins own their version numbers (declared in
 their `init.rb`) and their release tags; the deployment repository does not

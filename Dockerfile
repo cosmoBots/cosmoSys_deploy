@@ -49,6 +49,17 @@ RUN : "${COSMOSYS_LATEX_REVISION:?Pass COSMOSYS_LATEX_REVISION as a build argume
     && cp -a /tmp/redmine_cbots_latex plugins/redmine_cbots_latex \
     && rm -rf /tmp/redmine_cbots_latex/.git
 
+FROM cosmosys_base AS cosmosys_notebook_preview_source
+
+ARG REDMINE_NOTEBOOK_PREVIEW_REVISION
+
+RUN : "${REDMINE_NOTEBOOK_PREVIEW_REVISION:?Pass REDMINE_NOTEBOOK_PREVIEW_REVISION as a build argument}" \
+    && git clone --filter=blob:none https://github.com/cosmoBots/redmine_notebook_preview.git /tmp/redmine_notebook_preview \
+    && git -C /tmp/redmine_notebook_preview checkout "${REDMINE_NOTEBOOK_PREVIEW_REVISION}" \
+    && test "$(git -C /tmp/redmine_notebook_preview rev-parse HEAD)" = "${REDMINE_NOTEBOOK_PREVIEW_REVISION}" \
+    && cp -a /tmp/redmine_notebook_preview plugins/redmine_notebook_preview \
+    && rm -rf /tmp/redmine_notebook_preview/.git
+
 FROM cosmosys_base AS cosmosys_kroki
 
 ARG REDMINE_KROKI_REVISION
@@ -127,3 +138,24 @@ RUN apt-get -o Acquire::Retries=5 update \
     && rm -rf /var/lib/apt/lists/* /root/.bundle/cache /usr/local/bundle/cache
 
 LABEL eu.cosmobots.redmine-cbots-latex.revision="${COSMOSYS_LATEX_REVISION}"
+
+FROM cosmosys_requirements_kroki_latex AS cosmosys_requirements_kroki_latex_notebook_preview
+
+ARG REDMINE_NOTEBOOK_PREVIEW_REVISION
+
+COPY --from=cosmosys_notebook_preview_source /usr/src/redmine/plugins/redmine_notebook_preview plugins/redmine_notebook_preview
+
+RUN apt-get -o Acquire::Retries=5 update \
+    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends python3-venv \
+    && python3 -m venv /opt/nbconvert-env \
+    && /opt/nbconvert-env/bin/pip install --no-cache-dir nbconvert nbformat jupyter_core matplotlib \
+    && install -d -o redmine -g redmine -m 0750 /usr/src/redmine/notebook_cache \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JUPYTER_BIN=/opt/nbconvert-env/bin/jupyter \
+    NOTEBOOK_CACHE_DIR=/usr/src/redmine/notebook_cache
+
+RUN bundle install \
+    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+
+LABEL eu.cosmobots.redmine-notebook-preview.revision="${REDMINE_NOTEBOOK_PREVIEW_REVISION}"

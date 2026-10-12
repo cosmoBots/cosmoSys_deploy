@@ -21,6 +21,10 @@ docker compose -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
 COSMOSYS_LATEX_ENABLED=true docker compose \
   -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
   -f compose.requirements-kroki.yml -f compose.requirements-kroki-latex.yml config --quiet
+COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true docker compose \
+  -f compose.yml -f compose.requirements.yml -f compose.kroki.yml \
+  -f compose.requirements-kroki.yml -f compose.requirements-kroki-latex.yml \
+  -f compose.requirements-kroki-latex-notebook-preview.yml config --quiet
 docker compose -f compose.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.requirements.yml -f compose.shared-db.yml config --quiet
 docker compose -f compose.yml -f compose.kroki.yml -f compose.shared-db.yml config --quiet

@@ -101,6 +101,22 @@ deployment_latex_enabled() {
   esac
 }
 
+# Notebook Preview depends on redmine_cbots_latex. Its deployment wiring is
+# experimental and currently exposed only on top of the full validation stack.
+deployment_notebook_preview_enabled() {
+  notebook_preview_enabled_value=$(deployment_setting COSMOSYS_NOTEBOOK_PREVIEW_ENABLED false) || return
+
+  case "$notebook_preview_enabled_value" in
+    true|false)
+      printf '%s\n' "$notebook_preview_enabled_value"
+      ;;
+    *)
+      echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED must be true or false" >&2
+      return 2
+      ;;
+  esac
+}
+
 # Prints a label of a container, or "unknown" when the image predates it.
 deployment_container_label() {
   label_value=$(docker inspect --format "{{index .Config.Labels \"$2\"}}" "$1")
@@ -120,9 +136,14 @@ deployment_compose() {
   variant=$(deployment_variant) || return
   kroki_enabled=$(deployment_kroki_enabled) || return
   latex_enabled=$(deployment_latex_enabled) || return
+  notebook_preview_enabled=$(deployment_notebook_preview_enabled) || return
 
   if [ "$latex_enabled" = true ] && { [ "$variant" != requirements ] || [ "$kroki_enabled" != true ]; }; then
     echo "COSMOSYS_LATEX_ENABLED is currently supported only with COSMOSYS_VARIANT=requirements and COSMOSYS_KROKI_ENABLED=true" >&2
+    return 2
+  fi
+  if [ "$notebook_preview_enabled" = true ] && [ "$latex_enabled" != true ]; then
+    echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED requires COSMOSYS_LATEX_ENABLED=true" >&2
     return 2
   fi
 
@@ -138,8 +159,11 @@ deployment_compose() {
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
   fi
 
-  # Add the highest stack's optional layer last in Compose merge order. The
+  # Add the highest stack's optional layers last in Compose merge order. The
   # deployment is deliberately limited to this combination during evaluation.
+  if [ "$notebook_preview_enabled" = true ]; then
+    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex-notebook-preview.yml" "$@"
+  fi
   if [ "$latex_enabled" = true ]; then
     set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex.yml" "$@"
   fi

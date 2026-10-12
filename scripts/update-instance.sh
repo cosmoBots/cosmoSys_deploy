@@ -86,6 +86,7 @@ variant=$(deployment_variant)
 database_mode=$(deployment_db_mode)
 kroki_enabled=$(deployment_kroki_enabled)
 latex_enabled=$(deployment_latex_enabled)
+notebook_preview_enabled=$(deployment_notebook_preview_enabled)
 update_mode=$(deployment_setting COSMOSYS_UPDATE_MODE manual)
 
 case "$update_mode" in
@@ -112,6 +113,7 @@ running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmob
 running_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)
 running_cosmosys_kroki=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-kroki.revision)
 running_latex=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-cbots-latex.revision)
+running_notebook_preview=$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-notebook-preview.revision)
 
 # An instance provisioned before the variant was recorded runs the Requirements
 # image while its environment file says nothing, so it resolves to the base
@@ -141,6 +143,7 @@ if [ -n "$pins_file" ]; then
   declared_env=$(cat "$pins_file")
   declared_compose=$declared_env
   declared_requirements=$declared_env
+  declared_notebook_preview_compose=$declared_env
 else
   if ! git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
     echo "$deployment_repository_dir is not a git checkout, so the declared" >&2
@@ -174,12 +177,14 @@ else
   declared_env=$(git -C "$deployment_repository_dir" show "$source_ref:.env.example")
   declared_compose=$(git -C "$deployment_repository_dir" show "$source_ref:compose.yml")
   declared_requirements=$(git -C "$deployment_repository_dir" show "$source_ref:compose.requirements.yml")
+  declared_notebook_preview_compose=$(git -C "$deployment_repository_dir" show "$source_ref:compose.requirements-kroki-latex-notebook-preview.yml")
 
   # Everything that ends up inside the image, so that a stale checkout cannot
   # publish something else under the image tag that names those revisions.
   if git -C "$deployment_repository_dir" diff --quiet "$source_ref" -- \
     Dockerfile compose.yml compose.requirements.yml compose.kroki.yml \
     compose.requirements-kroki.yml compose.requirements-kroki-latex.yml \
+    compose.requirements-kroki-latex-notebook-preview.yml \
     compose.shared-db.yml compose.proxy.yml \
     config bootstrap; then
     deployment_drift=no
@@ -193,6 +198,7 @@ declared_cosmosys_req=$(printf '%s\n' "$declared_env" | declared_setting COSMOSY
 declared_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_KROKI_REVISION)
 declared_cosmosys_kroki_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_REVISION)
 declared_latex_revision=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_LATEX_REVISION)
+declared_notebook_preview_revision=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_NOTEBOOK_PREVIEW_REVISION)
 declared_rspreadsheet=$(printf '%s\n' "$declared_env" | declared_setting RSPREADSHEET_REVISION)
 declared_redmine_image=$(printf '%s\n' "$declared_env" | declared_setting REDMINE_IMAGE)
 declared_postgres_image=$(printf '%s\n' "$declared_env" | declared_setting POSTGRES_IMAGE)
@@ -201,6 +207,8 @@ declared_req_image=$(printf '%s\n' "$declared_requirements" | declared_compose_i
 declared_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
 declared_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
 declared_req_kroki_latex_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_IMAGE)
+declared_req_kroki_latex_notebook_preview_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)
+declared_req_kroki_latex_notebook_preview_image=${declared_req_kroki_latex_notebook_preview_image:-$(printf '%s\n' "$declared_notebook_preview_compose" | declared_compose_image COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)}
 
 if [ -n "$pins_file" ]; then
   # A pins file may name the image explicitly instead of relying on Compose.
@@ -208,10 +216,12 @@ if [ -n "$pins_file" ]; then
   pins_req_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_IMAGE)
   pins_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_KROKI_IMAGE)
   pins_req_kroki_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_IMAGE)
+  pins_req_kroki_latex_notebook_preview_image=$(printf '%s\n' "$declared_env" | declared_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE)
   declared_image=${pins_image:-$declared_image}
   declared_req_image=${pins_req_image:-$declared_req_image}
   declared_kroki_image=${pins_kroki_image:-$declared_kroki_image}
   declared_req_kroki_image=${pins_req_kroki_image:-$declared_req_kroki_image}
+  declared_req_kroki_latex_notebook_preview_image=${pins_req_kroki_latex_notebook_preview_image:-$declared_req_kroki_latex_notebook_preview_image}
 fi
 
 declared_effective_image=$declared_image
@@ -242,6 +252,18 @@ if [ "$latex_enabled" = true ]; then
     exit 2
   fi
   declared_effective_req_image=$declared_req_kroki_latex_image
+fi
+
+if [ "$notebook_preview_enabled" = true ]; then
+  if [ "$latex_enabled" != true ]; then
+    echo "Notebook Preview currently requires the Requirements + Kroki + LaTeX stack." >&2
+    exit 2
+  fi
+  if [ -z "$declared_notebook_preview_revision" ] || [ -z "$declared_req_kroki_latex_notebook_preview_image" ]; then
+    echo "Notebook Preview is enabled, but its plugin revision or image is not declared." >&2
+    exit 2
+  fi
+  declared_effective_req_image=$declared_req_kroki_latex_notebook_preview_image
 fi
 
 if [ "$variant" = requirements ]; then
@@ -276,6 +298,10 @@ printf ', rspreadsheet %s\n' "$declared_rspreadsheet"
 if [ "$latex_enabled" = true ]; then
   printf '          Redmine Cbots LaTeX %s\n' "$running_latex"
   printf 'Declared: Redmine Cbots LaTeX %s\n' "$declared_latex_revision"
+fi
+if [ "$notebook_preview_enabled" = true ]; then
+  printf '          Redmine Notebook Preview %s\n' "$running_notebook_preview"
+  printf 'Declared: Redmine Notebook Preview %s\n' "$declared_notebook_preview_revision"
 fi
 
 if [ "$deployment_drift" = yes ]; then
@@ -435,6 +461,10 @@ if [ "$latex_enabled" = true ]; then
   set_instance_setting COSMOSYS_LATEX_REVISION "$declared_latex_revision"
   set_instance_setting COSMOSYS_REQ_KROKI_LATEX_IMAGE "$declared_req_kroki_latex_image"
 fi
+if [ "$notebook_preview_enabled" = true ]; then
+  set_instance_setting REDMINE_NOTEBOOK_PREVIEW_REVISION "$declared_notebook_preview_revision"
+  set_instance_setting COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE "$declared_req_kroki_latex_notebook_preview_image"
+fi
 if [ "$variant" = requirements ]; then
   set_instance_setting COSMOSYS_REQ_REVISION "$declared_cosmosys_req"
   set_instance_setting COSMOSYS_REQ_IMAGE "$declared_req_image"
@@ -493,6 +523,12 @@ if [ "$latex_enabled" = true ]; then
     update_failed "The instance runs Redmine Cbots LaTeX $updated_latex instead of $declared_latex_revision."
   fi
 fi
+if [ "$notebook_preview_enabled" = true ]; then
+  updated_notebook_preview=$(deployment_container_label "$updated_container" eu.cosmobots.redmine-notebook-preview.revision)
+  if [ "$updated_notebook_preview" != "$declared_notebook_preview_revision" ]; then
+    update_failed "The instance runs Redmine Notebook Preview $updated_notebook_preview instead of $declared_notebook_preview_revision."
+  fi
+fi
 
 expected_plugins=cosmosys
 if [ "$variant" = requirements ]; then
@@ -503,6 +539,9 @@ if [ "$kroki_enabled" = true ]; then
 fi
 if [ "$latex_enabled" = true ]; then
   expected_plugins="$expected_plugins redmine_cbots_latex"
+fi
+if [ "$notebook_preview_enabled" = true ]; then
+  expected_plugins="$expected_plugins redmine_notebook_preview"
 fi
 if ! deployment_compose exec -T redmine bundle exec rails runner \
   "expected = %w[$expected_plugins]; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); missing = expected - actual; abort(\"missing plugins: #{missing.join(', ')}\") unless missing.empty?"; then
@@ -515,6 +554,10 @@ fi
 if [ "$latex_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
   "abort('Redmine Cbots LaTeX renderer is not loaded') unless defined?(RedmineCbotsLatex::LatexRenderer); abort('matplotlib is unavailable') unless system('/usr/bin/python3', '-c', 'import matplotlib', out: File::NULL, err: File::NULL); require 'tmpdir'; rendered = RedmineCbotsLatex::LatexRenderer.render_html('<p>\\(x^2\\)</p>', cache_dir: Dir.mktmpdir); abort('static LaTeX rendering did not produce an image') unless rendered.include?('data:image/png;base64,')"; then
   update_failed "The updated image does not provide static LaTeX rendering."
+fi
+if [ "$notebook_preview_enabled" = true ] && ! deployment_compose exec -T redmine bundle exec rails runner \
+  "settings = Setting.plugin_redmine_notebook_preview; abort('Jupyter is not executable') unless File.executable?(settings.fetch('jupyter_bin')); cache = settings.fetch('cache_dir'); abort('Notebook cache is not writable') unless File.directory?(cache) && File.writable?(cache)"; then
+  update_failed "The updated image does not provide a writable Notebook Preview runtime."
 fi
 
 cat <<EOF
