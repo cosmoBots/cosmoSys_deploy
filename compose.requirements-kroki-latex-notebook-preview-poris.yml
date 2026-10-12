@@ -1,5 +1,5 @@
 x-requirements-kroki-latex-notebook-preview-poris-redmine-image: &requirements-kroki-latex-notebook-preview-poris-image
-  image: ${COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE:-cosmobots/cosmosys-req-kroki-latex-notebook-preview-poris:9b1e823-6df0fce-489602a-7a98163-9ae5de3-91aa27e-1e953cf-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE:-cosmobots/cosmosys-req-kroki-latex-notebook-preview-poris:965eaf7-6df0fce-489602a-7a98163-9ae5de3-91aa27e-1e953cf-redmine-7.0.1}
   build:
     target: cosmosys_requirements_kroki_latex_notebook_preview_poris
     args:

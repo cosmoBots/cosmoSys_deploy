@@ -1,5 +1,5 @@
 x-requirements-kroki-redmine-image: &requirements-kroki-redmine-image
-  image: ${COSMOSYS_REQ_KROKI_IMAGE:-cosmobots/cosmosys-req-kroki:9b1e823-6df0fce-489602a-7a98163-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_KROKI_IMAGE:-cosmobots/cosmosys-req-kroki:965eaf7-6df0fce-489602a-7a98163-redmine-7.0.1}
   build:
     target: cosmosys_requirements_kroki
     args:
