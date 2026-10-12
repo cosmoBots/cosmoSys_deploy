@@ -3,6 +3,9 @@
 # COSMOSYS_PLUGINS=kroki and the scripts add this file.
 
 services:
+  # Starting redmine starts Kroki too. A Kroki that stops after starting does
+  # not hold Redmine back, but its images must be available and its containers
+  # must start, or redmine does not start either.
   redmine:
     depends_on:
       - kroki

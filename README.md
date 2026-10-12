@@ -171,12 +171,18 @@ does not change them behind its back. `cosmosys_kroki` adapts Mermaid macros
 during cosmoSys report export so their labels survive ODT conversion. The
 compatibility initializer gives Redmine-Kroki indifferent access to its
 settings: Redmine stores them with string keys and the macro reads symbols.
+Starting `redmine` starts Kroki too. A Kroki that stops after starting does
+not hold Redmine back, but its images must be available and its containers must
+start, or `redmine` does not start either.
 
 Instance files from before `plugins.conf` used `COSMOSYS_KROKI_ENABLED`,
 `COSMOSYS_LATEX_ENABLED` and `COSMOSYS_NOTEBOOK_PREVIEW_ENABLED`. The scripts
 stop when one of them is `true`: replace it with the equivalent
 `COSMOSYS_PLUGINS` and `COSMOSYS_TOOLS` lines and run the updater, which
 removes the old settings.
+
+[`docs/optional-plugins.md`](docs/optional-plugins.md) explains how the
+mechanism works inside, how to add a set and how to move its pins.
 
 An instance with its own environment file names its variant there, so
 `scripts/compose.sh` resolves the files it needs and every Compose command
