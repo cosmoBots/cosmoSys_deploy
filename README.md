@@ -269,14 +269,14 @@ Current pins (see `.env.example` and `compose*.yml`):
 | Component | Version | Commit | Tag |
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
-| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.6 | `af42cc4` | `0.1.6` |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.6 | `9b1e823` | `0.1.6` |
 | cosmoSys Requirements | 0.3.1 | `6df0fce` | `0.3.1` + localization |
 | rspreadsheet | pin | `c01d413` | n/a |
 | [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (fork version fix) | `489602a` | none |
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `7a98163` | n/a |
 | [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `9ae5de3` | n/a |
 | [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (optional) | 0.2.0 | `91aa27e` | `v0.2.0` |
-| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `0607a6f` | n/a |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `ee8beb1` | n/a |
 | Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
 
 The base variant installs `cosmoSys` only; the requirements variant adds
