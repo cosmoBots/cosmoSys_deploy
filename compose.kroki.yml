@@ -1,10 +1,10 @@
 x-kroki-redmine-image: &kroki-redmine-image
-  image: ${COSMOSYS_KROKI_IMAGE:-cosmobots/cosmosys-kroki:af42cc4-489602a-f510565-redmine-7.0.1}
+  image: ${COSMOSYS_KROKI_IMAGE:-cosmobots/cosmosys-kroki:af42cc4-489602a-7a98163-redmine-7.0.1}
   build:
     target: cosmosys_kroki
     args:
       REDMINE_KROKI_REVISION: ${REDMINE_KROKI_REVISION:-489602ae50b5949a24004e072670a12a379730cf}
-      COSMOSYS_KROKI_REVISION: ${COSMOSYS_KROKI_REVISION:-f51056561e10dc10d13efd0538473e3662c4d062}
+      COSMOSYS_KROKI_REVISION: ${COSMOSYS_KROKI_REVISION:-7a981637ba165cfcf331a826c5c8bc34d775d6ef}
 
 services:
   migrate:
