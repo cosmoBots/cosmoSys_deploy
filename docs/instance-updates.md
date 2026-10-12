@@ -1,9 +1,11 @@
 # How an instance is updated
 
-The version of an instance is the image its `redmine` container runs, and that
-image tag names the plugin revisions built into it. `scripts/update-instance.sh`
-moves one instance from the version it runs to the version this deployment
-declares. This document describes what it does in the order it does it, what
+The version of an instance is the image its `redmine` container runs, whose
+name is derived from its content (`scripts/image-tag.sh`), together with the
+optional plugin sets it was started with (`COSMOSYS_PLUGINS`).
+`scripts/update-instance.sh` moves one instance from the version it runs to the
+version this deployment declares, and changes its plugin sets when `--plugins`
+asks for it. This document describes what it does in the order it does it, what
 each step touches, and what a failure can cost.
 
 The command itself, its options and how to schedule it are in the README.
@@ -52,9 +54,12 @@ can only be undone from a backup.
    choice. The `redmine` container must be running; otherwise the script stops
    without doing anything.
 2. **Read what runs.** The revisions come from the labels of the running
-   container and not from any configuration file, because an environment file
-   can already name a version that has not been built or activated yet. If
-   those labels contradict the environment file, the script stops here.
+   container and the plugin sets from its environment, not from any
+   configuration file, because an environment file can already name a version
+   that has not been built or activated yet. If those labels contradict the
+   environment file, the script stops here. When a plugin set with database
+   migrations would be turned off, it stops here too unless
+   `--allow-plugin-removal` is passed.
 3. **Read what is declared.** `git fetch` followed by `git show REF:<file>`, or
    a pins file when one is given. The fetch only moves remote-tracking refs: no
    file of the checkout, no branch and no submodule pointer is modified. A
@@ -81,8 +86,9 @@ can only be undone from a backup.
 9. **Recreate.** Compose waits for the database to be healthy, runs `migrate`
    to completion, then `bootstrap`, and only then starts the new `redmine` and
    waits for it to become healthy.
-10. **Verify** that the new container carries the revisions that were asked for
-    and that it registers the plugins the variant expects.
+10. **Verify** that the new container carries the revisions and the catalog of
+    optional plugins that were asked for, and that it registers exactly the
+    plugins of its variant and plugin sets.
 
 ## What each step touches
 
@@ -130,7 +136,8 @@ the 0.1.0 to 0.1.1 upgrade asserts precisely that columns of the old schema are
 gone afterwards.
 
 Before that service completes, a failure costs nothing: the previous revisions
-go back into the environment file and the previous image is started again.
+and plugin sets go back into the environment file and the previous image is
+started again.
 After it completes, the code can be put back but the schema cannot, and the
 previous code may not understand the new schema.
 
@@ -170,8 +177,10 @@ restore, which removes only the objects owned by that instance role.
 
 ## Going back
 
-An update that fails after step 7 restores the previous revisions and starts
-the previous image, and then says what that does and does not undo. If the
+An update that fails after step 7 restores the previous revisions and plugin
+sets and starts the previous image by its identity, which the script tagged
+`cosmosys-rollback/<instance>:previous` before changing anything, and then says
+what that does and does not undo. If the
 migration had already run, the way back is the backup that the same update took
 in step 6, and the script prints the exact `restore.sh` command for it. The
 copy of the environment file it made in step 7 is kept as well, and the script
