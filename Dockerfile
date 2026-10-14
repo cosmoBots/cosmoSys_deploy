@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 ARG REDMINE_IMAGE
+# The variant the final stage builds on: base or requirements.
+ARG COSMOSYS_VARIANT=base
+
 FROM ${REDMINE_IMAGE} AS cosmosys_base
 
 COPY config/database.yml config/database.yml
@@ -29,7 +32,14 @@ RUN : "${COSMOSYS_REVISION:?Pass COSMOSYS_REVISION as a build argument}" \
 
 ENV RSPREADSHEET_PATH=/opt/rspreadsheet
 
-RUN bundle install \
+# Optional plugins, dormant under /opt/cosmosys/plugins-available until an
+# instance activates them; see plugins.conf.
+COPY plugins.conf scripts/catalog-lib.sh docker/install-optional-plugins.sh /opt/cosmosys-deploy/
+COPY kroki_compat /opt/cosmosys/plugins-available/redmine_kroki_compat
+COPY docker/additional_environment.rb config/additional_environment.rb
+
+RUN sh /opt/cosmosys-deploy/install-optional-plugins.sh \
+    && bundle install \
     && apt-get purge -y --auto-remove build-essential libxml2-dev pkg-config \
     && rm -rf /root/.bundle/cache /usr/local/bundle/cache
 
@@ -37,54 +47,6 @@ COPY bootstrap /opt/cosmosys-deploy/bootstrap
 
 LABEL eu.cosmobots.cosmosys.revision="${COSMOSYS_REVISION}" \
       eu.cosmobots.rspreadsheet.revision="${RSPREADSHEET_REVISION}"
-
-FROM cosmosys_base AS cosmosys_latex_source
-
-ARG COSMOSYS_LATEX_REVISION
-
-RUN : "${COSMOSYS_LATEX_REVISION:?Pass COSMOSYS_LATEX_REVISION as a build argument}" \
-    && git clone --filter=blob:none https://github.com/cosmoBots/redmine_cbots_latex.git /tmp/redmine_cbots_latex \
-    && git -C /tmp/redmine_cbots_latex checkout "${COSMOSYS_LATEX_REVISION}" \
-    && test "$(git -C /tmp/redmine_cbots_latex rev-parse HEAD)" = "${COSMOSYS_LATEX_REVISION}" \
-    && cp -a /tmp/redmine_cbots_latex plugins/redmine_cbots_latex \
-    && rm -rf /tmp/redmine_cbots_latex/.git
-
-FROM cosmosys_base AS cosmosys_notebook_preview_source
-
-ARG REDMINE_NOTEBOOK_PREVIEW_REVISION
-
-RUN : "${REDMINE_NOTEBOOK_PREVIEW_REVISION:?Pass REDMINE_NOTEBOOK_PREVIEW_REVISION as a build argument}" \
-    && git clone --filter=blob:none https://github.com/cosmoBots/redmine_notebook_preview.git /tmp/redmine_notebook_preview \
-    && git -C /tmp/redmine_notebook_preview checkout "${REDMINE_NOTEBOOK_PREVIEW_REVISION}" \
-    && test "$(git -C /tmp/redmine_notebook_preview rev-parse HEAD)" = "${REDMINE_NOTEBOOK_PREVIEW_REVISION}" \
-    && cp -a /tmp/redmine_notebook_preview plugins/redmine_notebook_preview \
-    && rm -rf /tmp/redmine_notebook_preview/.git
-
-FROM cosmosys_base AS cosmosys_kroki
-
-ARG REDMINE_KROKI_REVISION
-ARG COSMOSYS_KROKI_REVISION
-
-RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
-    && : "${COSMOSYS_KROKI_REVISION:?Pass COSMOSYS_KROKI_REVISION as a build argument}" \
-    && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
-    && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
-    && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
-    && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
-    && test -f plugins/redmine_kroki/init.rb \
-    && rm -rf /tmp/redmine-kroki \
-    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_kroki.git plugins/cosmosys_kroki \
-    && git -C plugins/cosmosys_kroki checkout "${COSMOSYS_KROKI_REVISION}" \
-    && test "$(git -C plugins/cosmosys_kroki rev-parse HEAD)" = "${COSMOSYS_KROKI_REVISION}" \
-    && test -f plugins/cosmosys_kroki/init.rb \
-    && rm -rf plugins/cosmosys_kroki/.git \
-    && bundle install \
-    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
-
-COPY kroki_compat plugins/redmine_kroki_compat
-
-LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}" \
-      eu.cosmobots.cosmosys-kroki.revision="${COSMOSYS_KROKI_REVISION}"
 
 FROM cosmosys_base AS cosmosys_requirements
 
@@ -100,80 +62,18 @@ RUN : "${COSMOSYS_REQ_REVISION:?Pass COSMOSYS_REQ_REVISION as a build argument}"
 
 LABEL eu.cosmobots.cosmosys-req.revision="${COSMOSYS_REQ_REVISION}"
 
-FROM cosmosys_requirements AS cosmosys_requirements_kroki
+# The image an instance runs: its variant plus the tools of the options it
+# uses. Everything above is shared by every instance of the same variant.
+FROM cosmosys_${COSMOSYS_VARIANT} AS cosmosys
 
-ARG REDMINE_KROKI_REVISION
-ARG COSMOSYS_KROKI_REVISION
+ARG COSMOSYS_TOOLS=
 
-RUN : "${REDMINE_KROKI_REVISION:?Pass REDMINE_KROKI_REVISION as a build argument}" \
-    && : "${COSMOSYS_KROKI_REVISION:?Pass COSMOSYS_KROKI_REVISION as a build argument}" \
-    && git clone --filter=blob:none https://github.com/cosmoBots/redmine-kroki.git /tmp/redmine-kroki \
-    && git -C /tmp/redmine-kroki checkout "${REDMINE_KROKI_REVISION}" \
-    && test "$(git -C /tmp/redmine-kroki rev-parse HEAD)" = "${REDMINE_KROKI_REVISION}" \
-    && cp -a /tmp/redmine-kroki/src plugins/redmine_kroki \
-    && test -f plugins/redmine_kroki/init.rb \
-    && rm -rf /tmp/redmine-kroki \
-    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_kroki.git plugins/cosmosys_kroki \
-    && git -C plugins/cosmosys_kroki checkout "${COSMOSYS_KROKI_REVISION}" \
-    && test "$(git -C plugins/cosmosys_kroki rev-parse HEAD)" = "${COSMOSYS_KROKI_REVISION}" \
-    && test -f plugins/cosmosys_kroki/init.rb \
-    && rm -rf plugins/cosmosys_kroki/.git \
-    && bundle install \
-    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
+COPY docker/install-tools.sh /opt/cosmosys-deploy/
+RUN sh /opt/cosmosys-deploy/install-tools.sh "${COSMOSYS_TOOLS}"
 
-COPY kroki_compat plugins/redmine_kroki_compat
+COPY docker/cosmosys-entrypoint.sh /opt/cosmosys-deploy/
 
-LABEL eu.cosmobots.redmine-kroki.revision="${REDMINE_KROKI_REVISION}" \
-      eu.cosmobots.cosmosys-kroki.revision="${COSMOSYS_KROKI_REVISION}"
+LABEL eu.cosmobots.tools="${COSMOSYS_TOOLS}"
 
-FROM cosmosys_requirements_kroki AS cosmosys_requirements_kroki_latex
-
-ARG COSMOSYS_LATEX_REVISION
-
-COPY --from=cosmosys_latex_source /usr/src/redmine/plugins/redmine_cbots_latex plugins/redmine_cbots_latex
-
-RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends python3-matplotlib \
-    && bundle install \
-    && rm -rf /var/lib/apt/lists/* /root/.bundle/cache /usr/local/bundle/cache
-
-LABEL eu.cosmobots.redmine-cbots-latex.revision="${COSMOSYS_LATEX_REVISION}"
-
-FROM cosmosys_requirements_kroki_latex AS cosmosys_requirements_kroki_latex_notebook_preview
-
-ARG REDMINE_NOTEBOOK_PREVIEW_REVISION
-
-COPY --from=cosmosys_notebook_preview_source /usr/src/redmine/plugins/redmine_notebook_preview plugins/redmine_notebook_preview
-
-RUN apt-get -o Acquire::Retries=5 update \
-    && apt-get -o Acquire::Retries=5 install -y --no-install-recommends python3-venv \
-    && python3 -m venv /opt/nbconvert-env \
-    && /opt/nbconvert-env/bin/pip install --no-cache-dir nbconvert nbformat jupyter_core matplotlib \
-    && install -d -o redmine -g redmine -m 0750 /usr/src/redmine/notebook_cache \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV JUPYTER_BIN=/opt/nbconvert-env/bin/jupyter \
-    NOTEBOOK_CACHE_DIR=/usr/src/redmine/notebook_cache
-
-RUN bundle install \
-    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
-
-LABEL eu.cosmobots.redmine-notebook-preview.revision="${REDMINE_NOTEBOOK_PREVIEW_REVISION}"
-
-FROM cosmosys_requirements_kroki_latex_notebook_preview AS cosmosys_requirements_kroki_latex_notebook_preview_poris
-
-ARG COSMOSYS_PORIS_REVISION
-
-RUN : "${COSMOSYS_PORIS_REVISION:?Pass COSMOSYS_PORIS_REVISION as a build argument}" \
-    && git clone --filter=blob:none https://github.com/cosmoBots/cosmosys_poris.git /tmp/cosmosys_poris \
-    && git -C /tmp/cosmosys_poris checkout "${COSMOSYS_PORIS_REVISION}" \
-    && test "$(git -C /tmp/cosmosys_poris rev-parse HEAD)" = "${COSMOSYS_PORIS_REVISION}" \
-    && cp -a /tmp/cosmosys_poris plugins/cosmosys_poris \
-    && rm -rf /tmp/cosmosys_poris/.git \
-    && test -s plugins/cosmosys_poris/assets/javascripts/poris_viewer/prod.js \
-    && ! grep -Eq 'process\.env(\.NODE_ENV)?' plugins/cosmosys_poris/assets/javascripts/poris_viewer/prod.js \
-    && test -s plugins/cosmosys_poris/assets/javascripts/poris_viewer/build-info.json \
-    && bundle install \
-    && rm -rf /root/.bundle/cache /usr/local/bundle/cache
-
-LABEL eu.cosmobots.cosmosys-poris.revision="${COSMOSYS_PORIS_REVISION}"
+ENTRYPOINT ["sh", "/opt/cosmosys-deploy/cosmosys-entrypoint.sh", "/docker-entrypoint.sh"]
+CMD ["rails", "server", "-b", "0.0.0.0"]

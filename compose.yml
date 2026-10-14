@@ -1,14 +1,19 @@
 name: cosmosys
 
 x-redmine-image: &redmine-image
-  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:965eaf7-redmine-7.0.1}
+  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:965eaf7-32dfe1f51355-redmine-7.0.1}
+  # Images are built here, never pulled: nobody controls the cosmobots
+  # namespace of Docker Hub on behalf of this deployment.
+  pull_policy: never
   build:
     context: .
-    target: cosmosys_base
+    target: cosmosys
     args:
       REDMINE_IMAGE: ${REDMINE_IMAGE:-redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1}
       COSMOSYS_REVISION: ${COSMOSYS_REVISION:-965eaf7224f95d6acd118961f5586be330b9f224}
       RSPREADSHEET_REVISION: ${RSPREADSHEET_REVISION:-c01d413abc728db9d62aa1bebe776f548ee69999}
+      COSMOSYS_VARIANT: base
+      COSMOSYS_TOOLS: ${COSMOSYS_TOOLS:-}
 
 x-redmine-environment: &redmine-environment
   REDMINE_DB_POSTGRES: db
@@ -23,6 +28,8 @@ x-redmine-environment: &redmine-environment
   REDMINE_LANG: ${REDMINE_LANG:-en}
   COSMOSYS_INITIAL_ADMIN_PASSWORD: ${COSMOSYS_INITIAL_ADMIN_PASSWORD:-}
   COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE: ${COSMOSYS_INITIAL_ADMIN_PASSWORD_FILE:-}
+  # Optional plugin sets of plugins.conf that this instance activates.
+  COSMOSYS_PLUGINS: ${COSMOSYS_PLUGINS:-}
 
 services:
   db:
