@@ -73,16 +73,17 @@ deployment_catalog="$deployment_repository_dir/plugins.conf"
 . "$deployment_repository_dir/scripts/catalog-lib.sh"
 
 # Prints the optional plugin sets of plugins.conf that the instance activates
-# (COSMOSYS_PLUGINS), one per line. Before plugins.conf, Kroki and LaTeX had a
-# switch each; an instance file that still turns one on has to say it with
-# COSMOSYS_PLUGINS instead, because those switches also chose images that no
-# longer exist.
+# (COSMOSYS_PLUGINS), one per line. Before plugins.conf, Kroki, LaTeX, the
+# notebook preview and PORIS had a switch each; an instance file that still
+# turns one on has to say it with COSMOSYS_PLUGINS instead, because those
+# switches also chose images that no longer exist.
 deployment_plugins() {
-  for legacy_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED COSMOSYS_NOTEBOOK_PREVIEW_ENABLED; do
+  for legacy_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED \
+    COSMOSYS_NOTEBOOK_PREVIEW_ENABLED COSMOSYS_PORIS_ENABLED; do
     legacy_value=$(deployment_setting "$legacy_setting" false) || return
     if [ "$legacy_value" = true ]; then
       echo "$legacy_setting=true belongs to the previous way of enabling optional plugins." >&2
-      echo "List the set in COSMOSYS_PLUGINS instead (kroki, latex, notebooks) and remove the old" >&2
+      echo "List the set in COSMOSYS_PLUGINS instead (kroki, latex, notebooks, poris) and remove the old" >&2
       echo "switches, then run scripts/update-instance.sh to rebuild the instance." >&2
       return 2
     fi

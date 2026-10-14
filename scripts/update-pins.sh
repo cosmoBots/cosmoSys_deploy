@@ -14,8 +14,9 @@ set -eu
 #   README.md                  the table of current pins
 #
 # Revisions only move forward unless --allow-backwards is given, and cosmoSys
-# Requirements has to accept the cosmoSys version it is pinned with. Nothing
-# is committed; the script ends by running scripts/check-config.sh.
+# Requirements and the optional plugins have to accept the cosmoSys version
+# they are pinned with. Nothing is committed; the script ends by running
+# scripts/check-config.sh.
 #
 #   scripts/update-pins.sh --cosmosys 0.1.7 --cosmosys-req 0.3.2
 #   scripts/update-pins.sh --plugin redmine_cbots_latex=main
@@ -246,25 +247,44 @@ if [ -n "$rspreadsheet_ref" ]; then
   record_move rspreadsheet "$rspreadsheet_url" "$rspreadsheet_old" "$rspreadsheet_new"
 fi
 
-# cosmoSys Requirements declares the lowest cosmoSys version it runs on.
-cosmosys_version=$(plugin_version "$cosmosys_url" "$cosmosys_new" '' cosmosys)
-required_cosmosys=$(git -C "$(repository "$cosmosys_req_url")" show "$cosmosys_req_new:init.rb" |
-  sed -n "s/.*requires_redmine_plugin[[:space:](]*:cosmosys,[[:space:]]*version_or_higher:[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" | head -n 1)
-if [ -n "$required_cosmosys" ] &&
-  [ "$(printf '%s\n%s\n' "$required_cosmosys" "$cosmosys_version" | sort_versions | head -n 1)" != "$required_cosmosys" ]; then
-  echo "cosmoSys Requirements $(short "$cosmosys_req_new") needs cosmoSys $required_cosmosys or later," >&2
-  echo "but cosmoSys $(short "$cosmosys_new") is $cosmosys_version." >&2
-  exit 3
-fi
-
 # Optional plugins.
+plugin_moves=
 for request in $plugin_requests; do
   plugin=${request%%=*}
   plugin_url=$(catalog_value "$catalog" "PLUGIN_${plugin}_SOURCE")
   plugin_old=$(catalog_value "$catalog" "PLUGIN_${plugin}_REVISION")
   plugin_new=$(resolve "$plugin_url" "${request#*=}")
   record_move "$plugin" "$plugin_url" "$plugin_old" "$plugin_new"
-  set_setting "$catalog" "PLUGIN_${plugin}_REVISION" "$plugin_new"
+  plugin_moves="$plugin_moves $plugin=$plugin_new"
+done
+
+# cosmoSys Requirements and some optional plugins declare the lowest cosmoSys
+# version they run on; checked before anything is written (NAME URL COMMIT DIR).
+cosmosys_version=$(plugin_version "$cosmosys_url" "$cosmosys_new" '' cosmosys)
+check_cosmosys_requirement() {
+  required_cosmosys=$(git -C "$(repository "$2")" show "$3:${4:+$4/}init.rb" |
+    sed -n "s/.*requires_redmine_plugin[[:space:](]*:cosmosys,[[:space:]]*version_or_higher:[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" | head -n 1)
+  if [ -n "$required_cosmosys" ] &&
+    [ "$(printf '%s\n%s\n' "$required_cosmosys" "$cosmosys_version" | sort_versions | head -n 1)" != "$required_cosmosys" ]; then
+    echo "$1 $(short "$3") needs cosmoSys $required_cosmosys or later," >&2
+    echo "but cosmoSys $(short "$cosmosys_new") is $cosmosys_version." >&2
+    exit 3
+  fi
+}
+check_cosmosys_requirement "cosmoSys Requirements" "$cosmosys_req_url" "$cosmosys_req_new" ''
+for plugin in $(catalog_all_plugins "$catalog"); do
+  plugin_url=$(catalog_value "$catalog" "PLUGIN_${plugin}_SOURCE")
+  [ -n "$plugin_url" ] || continue
+  plugin_revision=$(catalog_value "$catalog" "PLUGIN_${plugin}_REVISION")
+  for move in $plugin_moves; do
+    [ "${move%%=*}" != "$plugin" ] || plugin_revision=${move#*=}
+  done
+  check_cosmosys_requirement "$plugin" "$plugin_url" "$plugin_revision" \
+    "$(catalog_value "$catalog" "PLUGIN_${plugin}_SUBDIR")"
+done
+
+for move in $plugin_moves; do
+  set_setting "$catalog" "PLUGIN_${move%%=*}_REVISION" "${move#*=}"
 done
 
 set_setting "$environment" COSMOSYS_REVISION "$cosmosys_new"

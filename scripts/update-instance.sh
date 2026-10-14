@@ -130,8 +130,8 @@ running_rspreadsheet=$(deployment_container_label "$redmine_container" eu.cosmob
 running_cosmosys_req=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 
 # The plugin sets the container was started with. Images built before
-# plugins.conf have no tools label; they carried Kroki, LaTeX and the notebook
-# viewer inside and say so in labels of their own.
+# plugins.conf have no tools label; they carried Kroki, LaTeX, the notebook
+# viewer and PORIS inside and say so in labels of their own.
 if [ "$(docker inspect --format '{{index .Config.Labels "eu.cosmobots.tools"}}' "$redmine_container")" = '<no value>' ]; then
   running_plugins=
   if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-kroki.revision)" != unknown ]; then
@@ -142,6 +142,9 @@ if [ "$(docker inspect --format '{{index .Config.Labels "eu.cosmobots.tools"}}' 
   fi
   if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.redmine-notebook-preview.revision)" != unknown ]; then
     running_plugins="$running_plugins,notebooks"
+  fi
+  if [ "$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-poris.revision)" != unknown ]; then
+    running_plugins="$running_plugins,poris"
   fi
 else
   running_plugins=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$redmine_container" |
@@ -494,11 +497,13 @@ for pinned_setting in $(catalog_option_pins "$deployment_catalog" "$(printf '%s'
 done
 # Settings of the time when each optional plugin had an image of its own.
 for obsolete_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED \
-  COSMOSYS_NOTEBOOK_PREVIEW_ENABLED REDMINE_KROKI_REVISION \
-  COSMOSYS_KROKI_REVISION COSMOSYS_LATEX_REVISION \
-  REDMINE_NOTEBOOK_PREVIEW_REVISION COSMOSYS_KROKI_IMAGE \
-  COSMOSYS_REQ_KROKI_IMAGE COSMOSYS_REQ_KROKI_LATEX_IMAGE \
-  COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE; do
+  COSMOSYS_NOTEBOOK_PREVIEW_ENABLED COSMOSYS_PORIS_ENABLED \
+  REDMINE_KROKI_REVISION COSMOSYS_KROKI_REVISION COSMOSYS_LATEX_REVISION \
+  REDMINE_NOTEBOOK_PREVIEW_REVISION COSMOSYS_PORIS_REVISION \
+  COSMOSYS_KROKI_IMAGE COSMOSYS_REQ_KROKI_IMAGE \
+  COSMOSYS_REQ_KROKI_LATEX_IMAGE \
+  COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_IMAGE \
+  COSMOSYS_REQ_KROKI_LATEX_NOTEBOOK_PREVIEW_PORIS_IMAGE; do
   remove_instance_setting "$obsolete_setting"
 done
 
@@ -575,6 +580,15 @@ case ",$target_plugins," in
     if ! deployment_compose exec -T redmine bundle exec rails runner \
     "require 'open3'; require 'json'; settings = Setting.plugin_redmine_notebook_preview; jupyter = settings['jupyter_bin']; abort(\"#{jupyter} is not executable; the notebook preview settings should name #{ENV['JUPYTER_BIN']}\") unless File.executable?(jupyter.to_s); abort('matplotlib is unavailable next to jupyter') unless system(File.join(File.dirname(jupyter), 'python'), '-c', 'import matplotlib', out: File::NULL, err: File::NULL); notebook = JSON.generate('cells' => [{'cell_type' => 'markdown', 'metadata' => {}, 'source' => ['Notebook preview check']}], 'metadata' => {}, 'nbformat' => 4, 'nbformat_minor' => 5); html, error, status = Open3.capture3(jupyter, 'nbconvert', '--to', 'html', '--template', 'basic', '--stdin', '--stdout', stdin_data: notebook); abort(\"nbconvert failed: #{error}\") unless status.success? && html.include?('Notebook preview check')"; then
       update_failed "The updated image does not convert notebooks."
+    fi
+    ;;
+esac
+
+case ",$target_plugins," in
+  *,poris,*)
+    if ! deployment_compose exec -T redmine bundle exec rails runner \
+    "require 'net/http'; kinds = %w[poris_sys poris_param poris_mode poris_value poris_cmd]; abort('the poris project profile is not registered') unless Cosmosys::ProjectProfileRegistry.registered?('poris'); missing = kinds.reject { |kind| Cosmosys::ItemKindRegistry.registered?(kind) }; abort(\"PORIS item kinds are not registered: #{missing.join(', ')}\") unless missing.empty?; abort('the PORIS trackers are missing') unless Tracker.where(csys_key: kinds).count == kinds.size; viewer = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); bundle = viewer.join('prod.js'); abort('the PORIS viewer bundle is missing') unless bundle.file? && bundle.size > 100_000 && viewer.join('style.css').file?; abort('the PORIS viewer bundle needs Node: it refers to process.env') if bundle.read.match?(/process\\.env/); path = ActionController::Base.helpers.asset_path('plugin_assets/cosmosys_poris/poris_viewer/prod.js'); response = Net::HTTP.get_response(URI(\"http://127.0.0.1:3000#{path}\")); abort(\"the PORIS viewer bundle answered #{response.code} at #{path}\") unless response.is_a?(Net::HTTPSuccess)"; then
+      update_failed "The updated instance does not provide PORIS models and their viewer."
     fi
     ;;
 esac

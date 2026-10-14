@@ -134,10 +134,11 @@ Gemfile is moved. A plugin that needs another one (`requires_redmine_plugin` or
 `scripts/update-pins.sh` moves every pin of the deployment: cosmoSys, cosmoSys
 Requirements, rspreadsheet, the optional plugins and the Python tools. It takes
 a tag, a branch or a commit, pins the full commit, refuses to move backwards
-without `--allow-backwards`, and checks that cosmoSys Requirements accepts the
-pinned cosmoSys. It rewrites `.env.example`, the defaults of `compose.yml` and
-`compose.requirements.yml`, `plugins.conf`, `docker/python/` and the pins table
-of the README, and ends with `scripts/check-config.sh`. It commits nothing.
+without `--allow-backwards`, and checks that cosmoSys Requirements and the
+optional plugins accept the pinned cosmoSys. It rewrites `.env.example`, the
+defaults of `compose.yml` and `compose.requirements.yml`, `plugins.conf`,
+`docker/python/` and the pins table of the README, and ends with
+`scripts/check-config.sh`. It commits nothing.
 
 ```sh
 ./scripts/update-pins.sh --plugin redmine_notebook_preview=<tag-or-commit>
@@ -157,9 +158,12 @@ installed together agree. Validate as for a new set before committing new pins.
 Turning a set off removes its plugins from `plugins/` and its services from
 the instance, and nothing else. Tables, settings and macros stay: text written
 with a macro of the set stays as text, and tags stay in their tables, unseen,
-until the set is turned on again. The updater refuses to turn off a plugin
-with database migrations applied unless `--allow-plugin-removal` is passed, and
-never runs the migrations of a plugin backwards.
+until the set is turned on again. PORIS projects keep the `poris` profile,
+which nothing registers once the set is off: they can be read and their items
+edited, but their settings cannot be saved and no item can be added to them.
+The updater refuses to turn off a plugin with database migrations applied
+unless `--allow-plugin-removal` is passed, and never runs the migrations of a
+plugin backwards.
 
 ## Errors
 
