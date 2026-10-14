@@ -7,9 +7,8 @@ set -eu
 # of variant, database mode, proxy and plugin sets through the wrapper.
 
 root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-cd "$root_dir"
-
 . "$root_dir/scripts/deployment-lib.sh"
+cd "$root_dir"
 
 errors=0
 error() {
