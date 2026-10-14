@@ -106,141 +106,93 @@ docker compose -f compose.yml -f compose.requirements.yml build
 docker compose -f compose.yml -f compose.requirements.yml up -d
 ```
 
-## Optional Kroki support
+## Optional plugins
 
-> **EXPERIMENTAL:** Kroki works, but its optional deployment wiring is
-> provisional until Iván integrates it into a more modular deployment strategy.
-> It remains opt-in; keep it disabled when it is not needed.
-
-Kroki support is opt-in per instance. Set this in that instance's environment
-file:
+Some plugins are optional: Kroki diagrams, LaTeX formulas, Jupyter notebook
+previews, PORIS models and tags today. Every image carries all of them, dormant
+in `/opt/cosmosys/plugins-available` where Redmine never looks, and an instance
+lists the sets it uses in its environment file:
 
 ```dotenv
-COSMOSYS_KROKI_ENABLED=true
+COSMOSYS_PLUGINS=kroki,latex
+COSMOSYS_TOOLS=mathtext
 ```
 
-LaTeX is also available as an experimental opt-in, currently on the highest
-stack (Requirements + Kroki) so it can be validated before the deployment is
-made more modular. The LaTeX plugin itself is independent of cosmoSys; its
-current deployment combination is only a validation step.
+When a container starts, its entrypoint copies the plugins of those sets into
+`plugins/` and hands over to the entrypoint of the Redmine image. A dormant
+plugin is never loaded: Redmine only reads `plugins/`, and the gems of every
+optional plugin are installed in a Bundler group of their own that is only
+required when the plugin is active. The Gemfile is the same whichever sets are
+active, so a container never installs gems when it starts.
 
-Enable both Kroki and LaTeX in an instance environment file:
+| Set | Plugins | Services | Tools |
+| --- | --- | --- | --- |
+| `kroki` | Redmine-Kroki, `cosmosys_kroki` and a settings compatibility initializer | Kroki gateway with Mermaid, BPMN, Excalidraw and diagrams.net companions (`compose.kroki.yml`) | none |
+| `latex` | `redmine_cbots_latex` | none | `mathtext` (matplotlib) |
+| `notebooks` | `redmine_cbots_latex` and `redmine_notebook_preview` | none | `mathtext` and `nbconvert` (nbconvert, nbformat, jupyter_core) |
+| `poris` | `cosmosys_poris`: the PORIS project profile, its item kinds and trackers, and the porisViewer | none | none |
+| `tags` | `additionals` and `additional_tags` | none | none |
 
-```dotenv
-COSMOSYS_VARIANT=requirements
-COSMOSYS_KROKI_ENABLED=true
-COSMOSYS_LATEX_ENABLED=true
-```
+[`plugins.conf`](plugins.conf) declares each set, its plugins and their
+pinned revisions, and is the only place where they are declared. A set with
+services adds its overlay; the scripts add it by themselves, so
+`scripts/compose.sh` and the updater read the same configuration.
 
-> **EXPERIMENTAL:** LaTeX works, but this deployment wiring is provisional
-> until Iván integrates it into a more modular deployment strategy. It is
-> currently supported only with Requirements + Kroki.
+Tools are the one part that is not in every image. The last build stage
+installs the tool groups of `COSMOSYS_TOOLS`, so an instance without LaTeX does
+not carry matplotlib, and its image name ends with the groups it has
+(`...-redmine-7.0.1-mathtext`). Python tools go into one virtual environment,
+`/opt/cosmosys-python`, from requirements pinned with their hashes in
+`docker/python/`, so a rebuild installs exactly the same packages. The
+scripts check that `COSMOSYS_TOOLS` matches the sets before building or
+starting anything, and the entrypoint refuses a set whose tools its image lacks
+instead of starting without it.
 
-### Jupyter Notebook Preview
-
-> **EXPERIMENTAL:** Notebook Preview is available for evaluation, not yet a
-> settled deployment feature. Its wiring is provisional pending a more modular
-> deployment strategy.
-
-The optional `redmine_notebook_preview` plugin renders attached `.ipynb`
-notebooks inline through `nbconvert`; it does not execute notebook cells. It
-has a hard dependency on `redmine_cbots_latex`, so this deployment currently
-allows it only on the full Requirements + Kroki + LaTeX stack. This is a
-temporary deployment constraint, not a dependency on cosmoSys or Kroki in the
-plugin itself.
-
-To enable the complete validation stack in an instance environment file:
-
-```dotenv
-COSMOSYS_VARIANT=requirements
-COSMOSYS_KROKI_ENABLED=true
-COSMOSYS_LATEX_ENABLED=true
-COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true
-```
-
-Notebook Preview is disabled by default. Its source revision is pinned in
-`REDMINE_NOTEBOOK_PREVIEW_REVISION`; the image also installs `nbconvert` and
-creates a Redmine-writable preview cache. Use the normal
-`scripts/update-instance.sh` flow for an existing instance so a backup is taken
-before switching images. The isolated full-stack check is:
+Choose the sets of a new instance with `scripts/provision-instance.sh
+--plugins kroki,latex`, which writes both settings and the image name. Change
+them on an existing instance with the updater, which takes a backup first and
+returns to the previous image and sets if anything fails:
 
 ```sh
-./scripts/validate-deployment.sh requirements-kroki-latex-notebook-preview
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env \
+  ./scripts/update-instance.sh --plugins kroki,latex
 ```
 
-### PORIS
+Turning a set off leaves its tables, settings and macros behind. The updater
+therefore refuses to turn off a plugin with database migrations applied unless
+`--allow-plugin-removal` is passed, and it stops the services of the sets it
+turns off. Text written with `{{kroki(...)}}` or `{{latex(...)}}` stays as text,
+and tags stay in their tables, unseen, until the set is turned on again. PORIS
+projects and their trackers stay as well: they can be read and their items
+edited, but their settings cannot be saved and no item can be added to them
+until `poris` is turned on again.
 
-> **EXPERIMENTAL:** PORIS is enabled only on top of the current complete plugin
-> validation stack. This deployment constraint is provisional and does not
-> mean the `cosmosys_poris` plugin depends on Requirements, Kroki, LaTeX or
-> Notebook Preview.
+Kroki runs as separate services on the private network of the instance, in
+Kroki `SECURE` mode, with no port published on the host. Its five images are
+pinned by digest in `.env.example`, and the updater copies them into the
+environment file of each instance that uses the set, so moving the checkout
+does not change them behind its back. `cosmosys_kroki` adapts Mermaid macros
+during cosmoSys report export so their labels survive ODT conversion. The
+compatibility initializer gives Redmine-Kroki indifferent access to its
+settings: Redmine stores them with string keys and the macro reads symbols.
+Starting `redmine` starts Kroki too. A Kroki that stops after starting does
+not hold Redmine back, but its images must be available and its containers must
+start, or `redmine` does not start either.
 
-Set `COSMOSYS_PORIS_ENABLED=true` to add the pinned `cosmosys_poris` plugin to
-the Requirements + Kroki + LaTeX + Notebook Preview stack. The plugin
-repository includes its prebuilt `porisViewer` bundle, so the image build does
-not need Node.js. The workspace promotion script rebuilds that bundle from the
-`porisViewer` submodule before publishing `cosmosys_poris`; the plugin build,
-Docker build, isolated validation and instance update all reject unresolved
-`process.env` references so a Node-only bundle cannot be deployed. For the
-current full validation stack, the instance
-environment file should contain:
+`cosmosys_poris` registers the `poris` project profile, with item kinds and
+trackers of its own, and a PORIS tab with the porisViewer. Its repository
+carries the viewer bundle already built, so the image needs no Node; the
+updater and the validation check that the bundle is served. It needs cosmoSys
+0.1.7 or later, which `scripts/update-pins.sh` checks whenever it moves a pin.
 
-```dotenv
-COSMOSYS_VARIANT=requirements
-COSMOSYS_KROKI_ENABLED=true
-COSMOSYS_LATEX_ENABLED=true
-COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true
-COSMOSYS_PORIS_ENABLED=true
-```
+Instance files from before `plugins.conf` used `COSMOSYS_KROKI_ENABLED`,
+`COSMOSYS_LATEX_ENABLED`, `COSMOSYS_NOTEBOOK_PREVIEW_ENABLED` and
+`COSMOSYS_PORIS_ENABLED`. The scripts stop when one of them is `true`: replace
+it with the equivalent `COSMOSYS_PLUGINS` and `COSMOSYS_TOOLS` lines and run
+the updater, which removes the old settings.
 
-The wrapper selects the PORIS overlay last, extending the whole stack rather
-than replacing any existing plugin layer. The isolated check is:
-
-```sh
-./scripts/validate-deployment.sh requirements-kroki-latex-notebook-preview-poris
-```
-
-PORIS remains opt-in and disabled by default.
-
-The Compose wrapper then adds the appropriate Kroki overlays automatically. The
-Redmine image is built with the pinned `redmine_kroki` and `cosmosys_kroki`
-plugins, while Kroki itself runs as a separate service with its official
-diagram-rendering companion services. Their default server URL,
-`http://kroki:8000`, resolves on the
-private Compose network. No Kroki port is published on the host. Set the option
-to `false` (the default) to omit both plugins and the Kroki services; the regular
-cosmoSys images do not depend on Kroki. Kroki-enabled images also include a
-small deployment compatibility initializer: Redmine stores plugin settings with
-string keys, while the upstream macro reads them as symbols. The initializer
-provides indifferent access without patching or forking `redmine-kroki`.
-
-The gateway is explicitly run in Kroki `SECURE` safe mode. The core and four
-companion images are pinned by multi-architecture digest in `.env.example`;
-they may be overridden through the corresponding `KROKI_*_IMAGE` settings.
-The current `0.32.1` pin includes fixes for URL-loading bypasses in Vega's
-secure-mode checks; keep Kroki and its companions on a reviewed, compatible
-release rather than downgrading the image tags.
-Kroki's core image is large, so enabling it adds a substantial first pull and
-build. For a new instance, enable the option, then build and start through the
-wrapper:
-
-```sh
-COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh build
-COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env ./scripts/compose.sh up -d
-```
-
-For a persistent instance that already contains data, use the normal
-`scripts/update-instance.sh` workflow after changing the flag so it takes a
-backup before switching to the separate Kroki image tag. `scripts/provision-instance.sh --kroki`
-can create a new instance environment file with Kroki enabled.
-
-The deployment option adds both Kroki integration plugins and the Kroki
-services; it does not make the ordinary cosmoSys image depend on either plugin
-or on a Kroki server. `cosmosys_kroki` adapts Mermaid macros during cosmoSys
-report export so their labels survive ODT conversion; it is installed only in
-the Kroki-enabled image variant. cosmoSys report export also sanitizes
-Kroki SVGs while preserving safe in-document references such as arrowheads and
-reused shapes, and continues to reject external resource loads.
+[`docs/optional-plugins.md`](docs/optional-plugins.md) explains how the
+mechanism works inside, how to add a set and how to move its pins.
 
 An instance with its own environment file names its variant there, so
 `scripts/compose.sh` resolves the files it needs and every Compose command
@@ -261,6 +213,20 @@ The default Redmine and PostgreSQL images, plugin sources and rspreadsheet
 source are pinned to immutable revisions. Updating one is a deliberate change
 that must be validated for both deployment variants.
 
+Move pins with `scripts/update-pins.sh`, never by hand. It resolves a tag,
+branch or commit to the full commit, refuses to move backwards, checks that
+cosmoSys Requirements and the optional plugins accept the pinned cosmoSys, and
+rewrites every place that derives from the pins: `.env.example`, the Compose
+defaults and image names, `plugins.conf`, the Python requirements and the table
+below. It commits nothing and ends with `scripts/check-config.sh`:
+
+```sh
+./scripts/update-pins.sh --cosmosys 0.1.7 --cosmosys-req 0.3.2
+./scripts/update-pins.sh --plugin redmine_cbots_latex=<commit>
+./scripts/update-pins.sh --python      # resolve the Python tools again
+./scripts/update-pins.sh               # rewrite only what derives from the pins
+```
+
 ## Components and source revisions
 
 This deployment installs cosmoSys plugins on top of the pinned Redmine image.
@@ -268,41 +234,39 @@ For every change, each plugin repository declares a semantic version
 and, where applicable, a release tag; the deployment pins the exact commit
 that was validated.
 
-Current pins (see `.env.example` and `compose*.yml`):
+Current pins, generated by `scripts/update-pins.sh` from `.env.example`,
+`plugins.conf` and `docker/python/`:
 
+<!-- pins:start -->
 | Component | Version | Commit | Tag |
 | --- | --- | --- | --- |
-| Redmine | 7.0.1 | manifest (see `.env.example`) | n/a |
-| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.6 | `9b1e823` | `0.1.6` |
-| cosmoSys Requirements | 0.3.1 | `6df0fce` | `0.3.1` + localization |
-| rspreadsheet | pin | `c01d413` | n/a |
-| [Redmine-Kroki](https://github.com/cosmoBots/redmine-kroki) (optional) | 0.5.0 (fork version fix) | `489602a` | none |
-| [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (optional) | 0.1.0 | `7a98163` | n/a |
-| [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (optional) | 0.1.0 | `9ae5de3` | n/a |
-| [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (optional) | 0.2.0 | `91aa27e` | `v0.2.0` |
-| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (optional) | 0.1.0 | `1e953cf` | n/a |
-| Kroki server + companions (optional) | 0.32.1 | image digests in `.env.example` | n/a |
+| Redmine | 7.0.1 | image manifest in `.env.example` | n/a |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.1.7 | `965eaf7` | `0.1.7` |
+| [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.2 | `64f584b` | after `0.3.2` |
+| [rspreadsheet](https://github.com/cosmoBots/rspreadsheet) | n/a | `c01d413` | after `v0.5.3` |
+| [redmine_kroki](https://github.com/cosmoBots/redmine-kroki) (`kroki`) | 0.5.0 | `489602a` | none |
+| `redmine_kroki_compat` (`kroki`) | n/a | `kroki_compat/` in this repository | n/a |
+| [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (`kroki`) | 0.1.0 | `6038fce` | none |
+| [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (`latex`, `notebooks`) | 0.1.0 | `9ae5de3` | none |
+| [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (`notebooks`) | 0.2.0 | `91aa27e` | `v0.2.0` |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (`poris`) | 0.1.0 | `6c57466` | none |
+| [additionals](https://github.com/AlphaNodes/additionals) (`tags`) | 4.6.0 | `5f5ff95` | `4.6.0` |
+| [additional_tags](https://github.com/AlphaNodes/additional_tags) (`tags`) | 4.6.0 | `3d503b1` | `4.6.0` |
+| Services of `kroki` | 0.32.1 | image digests in `.env.example` | n/a |
+| Python tools `mathtext` | matplotlib 3.11.2 | hashes in `docker/python/mathtext.txt` | n/a |
+| Python tools `nbconvert` | nbconvert 7.17.2, nbformat 5.11.1, jupyter_core 5.9.1 | hashes in `docker/python/nbconvert.txt` | n/a |
+<!-- pins:end -->
 
 The base variant installs `cosmoSys` only; the requirements variant adds
-`cosmoSys Requirements`. Setting `COSMOSYS_KROKI_ENABLED=true` adds the
-independently pinned Redmine-Kroki and `cosmosys_kroki` plugins to either
-variant. Kroki image tags embed the short commits of cosmoSys, Redmine-Kroki
-and `cosmosys_kroki` (plus cosmoSys Requirements in that variant); the regular
-image tags identify their cosmoSys plugin revisions:
-(`cosmobots/cosmosys:<cosmosys_short>-redmine-7.0.1` and
-`cosmobots/cosmosys-req:<cosmosys_short>-<req_short>-redmine-7.0.1`), so the
-running image identifies the exact plugin revision.
-
-Setting `COSMOSYS_LATEX_ENABLED=true` currently requires the requirements
-variant and Kroki. It adds `redmine_cbots_latex` and `python3-matplotlib` to
-that image for static formula rendering; this is the highest-stack validation
-path, not a permanent dependency on cosmoSys or Kroki.
-
-Setting `COSMOSYS_NOTEBOOK_PREVIEW_ENABLED=true` additionally requires
-`COSMOSYS_LATEX_ENABLED=true`. It adds the pinned Notebook Preview plugin and
-an isolated Python environment with `nbconvert`, `nbformat`, `jupyter_core`,
-and `matplotlib`, plus a writable cache directory. The plugin's
-`redmine_cbots_latex` dependency is required at Redmine startup.
+`cosmoSys Requirements`. Both carry every optional plugin of `plugins.conf`.
+Image names are derived from their content by `scripts/image-tag.sh`: the short
+revisions of cosmoSys (and cosmoSys Requirements), a hash of everything that
+ends up in the image, the Redmine version and the tool groups, for example
+`cosmobots/cosmosys-req:965eaf7-64f584b-cf55a326f5b8-redmine-7.0.1-mathtext`.
+Any change to the Dockerfile, the catalog, the bootstrap content or a pinned
+revision gives another name, so an instance whose image name matches the
+declared one runs exactly that content. `scripts/check-config.sh` fails when a
+declared name does not match the content of the checkout.
 
 **Versioning strategy.** The plugins own their version numbers (declared in
 their `init.rb`) and their release tags; the deployment repository does not
@@ -349,7 +313,10 @@ when an update is available. Without it the script applies the update: it backs
 the instance up, writes the new revisions into the instance environment file,
 builds the image, recreates the instance, waits for it to become healthy and
 verifies that the new container carries the revisions that were asked for and
-registers the expected plugins.
+registers exactly the plugins of its variant and plugin sets. An instance is up
+to date when it runs the declared image with the plugin sets of its environment
+file; `--plugins` changes those sets as part of the update (see
+[Optional plugins](#optional-plugins)).
 
 The declared version is read from `origin/main` with `git fetch` and
 `git show`, never from the working tree, so the script works the same on a
@@ -389,8 +356,10 @@ Each instance is locked while it is updated, so a scheduled update and a manual
 one never recreate the same instance at once; the second one stops with status
 4. Instances on one host still update in parallel with each other.
 
-When an update fails, the script puts the previous revisions back in the
-environment file and starts the previous image, which is still on the host.
+When an update fails, the script puts the previous revisions and plugin sets
+back in the environment file and starts the previous image by its identity,
+tagged `cosmosys-rollback/<instance>:previous` before the update began, so the
+way back never depends on a name the checkout may have redefined.
 That undoes the code but not the schema: if the migration had already run, the
 way back is the backup the update took, and the script prints the `restore.sh`
 command for it. For the same reason it refuses three situations rather than

@@ -69,69 +69,77 @@ deployment_variant() {
   esac
 }
 
-# Prints "true" or "false" for the optional Kroki plugin and services.
-deployment_kroki_enabled() {
-  kroki_enabled_value=$(deployment_setting COSMOSYS_KROKI_ENABLED false) || return
+deployment_catalog="$deployment_repository_dir/plugins.conf"
+. "$deployment_repository_dir/scripts/catalog-lib.sh"
 
-  case "$kroki_enabled_value" in
-    true|false)
-      printf '%s\n' "$kroki_enabled_value"
-      ;;
-    *)
-      echo "COSMOSYS_KROKI_ENABLED must be true or false" >&2
+# Prints the optional plugin sets of plugins.conf that the instance activates
+# (COSMOSYS_PLUGINS), one per line. Before plugins.conf, Kroki, LaTeX, the
+# notebook preview and PORIS had a switch each; an instance file that still
+# turns one on has to say it with COSMOSYS_PLUGINS instead, because those
+# switches also chose images that no longer exist.
+deployment_plugins() {
+  for legacy_setting in COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED \
+    COSMOSYS_NOTEBOOK_PREVIEW_ENABLED COSMOSYS_PORIS_ENABLED; do
+    legacy_value=$(deployment_setting "$legacy_setting" false) || return
+    if [ "$legacy_value" = true ]; then
+      echo "$legacy_setting=true belongs to the previous way of enabling optional plugins." >&2
+      echo "List the set in COSMOSYS_PLUGINS instead (kroki, latex, notebooks, poris) and remove the old" >&2
+      echo "switches, then run scripts/update-instance.sh to rebuild the instance." >&2
       return 2
-      ;;
-  esac
+    fi
+  done
+
+  plugins_value=$(deployment_setting COSMOSYS_PLUGINS '') || return
+  catalog_options "$deployment_catalog" "$plugins_value"
 }
 
-# Prints "true" or "false" for LaTeX. Its current deployment wiring is
-# experimental and provisional pending a more modular strategy; for now it is
-# exposed only on the full Requirements + Kroki stack.
-deployment_latex_enabled() {
-  latex_enabled_value=$(deployment_setting COSMOSYS_LATEX_ENABLED false) || return
-
-  case "$latex_enabled_value" in
-    true|false)
-      printf '%s\n' "$latex_enabled_value"
-      ;;
-    *)
-      echo "COSMOSYS_LATEX_ENABLED must be true or false" >&2
-      return 2
-      ;;
-  esac
+# Prints the tool groups the image of the instance has to include for its
+# plugin sets, one per line.
+deployment_tools() {
+  tools_plugins=$(deployment_plugins) || return
+  catalog_option_tools "$deployment_catalog" "$tools_plugins"
 }
 
-# Notebook Preview depends on redmine_cbots_latex. Its deployment wiring is
-# experimental and currently exposed only on top of the full validation stack.
-deployment_notebook_preview_enabled() {
-  notebook_preview_enabled_value=$(deployment_setting COSMOSYS_NOTEBOOK_PREVIEW_ENABLED false) || return
-
-  case "$notebook_preview_enabled_value" in
-    true|false)
-      printf '%s\n' "$notebook_preview_enabled_value"
-      ;;
-    *)
-      echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED must be true or false" >&2
-      return 2
-      ;;
-  esac
+# Checks that COSMOSYS_TOOLS, the build argument of the last stage, provides
+# the tools of the plugin sets, so that Compose never builds an image whose
+# entrypoint will refuse the instance.
+deployment_check_tools() {
+  required_tools=$(deployment_tools) || return
+  required_tools=$(printf '%s\n' "$required_tools" | catalog_join ' ')
+  declared_tools_value=$(deployment_setting COSMOSYS_TOOLS '') || return
+  declared_tools=$(catalog_tools "$deployment_catalog" "$declared_tools_value") || return
+  declared_tools=$(printf '%s\n' "$declared_tools" | catalog_join ' ')
+  if [ "$required_tools" != "$declared_tools" ]; then
+    echo "COSMOSYS_TOOLS=${declared_tools_value} does not match the tools of COSMOSYS_PLUGINS (${required_tools:-none})." >&2
+    echo "Change the plugin sets of an instance with scripts/update-instance.sh --plugins." >&2
+    return 2
+  fi
 }
 
-# PORIS is provisionally exposed only above the current complete validation
-# stack. That wiring constraint is temporary; the plugin itself needs cosmoSys,
-# not Requirements, Kroki, LaTeX or Notebook Preview.
-deployment_poris_enabled() {
-  poris_enabled_value=$(deployment_setting COSMOSYS_PORIS_ENABLED false) || return
+# Prints the image name that compose.yml (base) or compose.requirements.yml
+# (requirements) declares by default, in this checkout or at git reference REF.
+deployment_declared_image() {
+  if [ "$1" = requirements ]; then
+    image_file=compose.requirements.yml
+    image_key=COSMOSYS_REQ_IMAGE
+  else
+    image_file=compose.yml
+    image_key=COSMOSYS_IMAGE
+  fi
+  if [ -n "${2:-}" ]; then
+    image_text=$(git -C "$deployment_repository_dir" show "$2:$image_file") || return
+  else
+    image_text=$(cat "$deployment_repository_dir/$image_file")
+  fi
+  printf '%s\n' "$image_text" | sed -n "s/.*\${$image_key:-\([^}]*\)}.*/\1/p" | head -n 1
+}
 
-  case "$poris_enabled_value" in
-    true|false)
-      printf '%s\n' "$poris_enabled_value"
-      ;;
-    *)
-      echo "COSMOSYS_PORIS_ENABLED must be true or false" >&2
-      return 2
-      ;;
-  esac
+# Prints IMAGE with the suffix the last build stage adds for TOOL_GROUPS, the
+# convention of scripts/image-tag.sh.
+deployment_image_with_tools() {
+  image_tools=$(catalog_tools "$deployment_catalog" "${2:-}") || return
+  image_tools=$(printf '%s\n' "$image_tools" | sed '/^$/d' | catalog_join .)
+  printf '%s%s\n' "$1" "${image_tools:+-$image_tools}"
 }
 
 # Prints a label of a container, or "unknown" when the image predates it.
@@ -151,26 +159,20 @@ deployment_compose() {
   db_mode=$(deployment_db_mode) || return
   proxy_mode=$(deployment_proxy_mode) || return
   variant=$(deployment_variant) || return
-  kroki_enabled=$(deployment_kroki_enabled) || return
-  latex_enabled=$(deployment_latex_enabled) || return
-  notebook_preview_enabled=$(deployment_notebook_preview_enabled) || return
-  poris_enabled=$(deployment_poris_enabled) || return
+  compose_plugins=$(deployment_plugins) || return
 
-  if [ "$latex_enabled" = true ] && { [ "$variant" != requirements ] || [ "$kroki_enabled" != true ]; }; then
-    echo "COSMOSYS_LATEX_ENABLED is currently supported only with COSMOSYS_VARIANT=requirements and COSMOSYS_KROKI_ENABLED=true" >&2
-    return 2
-  fi
-  if [ "$notebook_preview_enabled" = true ] && [ "$latex_enabled" != true ]; then
-    echo "COSMOSYS_NOTEBOOK_PREVIEW_ENABLED requires COSMOSYS_LATEX_ENABLED=true" >&2
-    return 2
-  fi
-  if [ "$poris_enabled" = true ] && {
-    [ "$variant" != requirements ] || [ "$kroki_enabled" != true ] ||
-    [ "$latex_enabled" != true ] || [ "$notebook_preview_enabled" != true ];
-  }; then
-    echo "COSMOSYS_PORIS_ENABLED is currently supported only on the full validation stack: Requirements + Kroki + LaTeX + Notebook Preview" >&2
-    return 2
-  fi
+  # Commands that build or start containers need an image with the tools of
+  # the plugin sets; reading the state of an instance does not.
+  for compose_argument in "$@"; do
+    case "$compose_argument" in
+      -*) ;;
+      up|build|run|create|start|restart)
+        deployment_check_tools || return
+        break
+        ;;
+      *) break ;;
+    esac
+  done
 
   if [ -n "${COSMOSYS_COMPOSE_PROJECT:-}" ]; then
     set -- -p "$COSMOSYS_COMPOSE_PROJECT" "$@"
@@ -184,28 +186,12 @@ deployment_compose() {
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
   fi
 
-  # Add optional layers in reverse order because their arguments are prepended.
-  # PORIS currently tops the complete validation stack during evaluation.
-  if [ "$poris_enabled" = true ]; then
-    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex-notebook-preview-poris.yml" "$@"
-  fi
-  if [ "$notebook_preview_enabled" = true ]; then
-    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex-notebook-preview.yml" "$@"
-  fi
-  if [ "$latex_enabled" = true ]; then
-    set -- -f "$deployment_repository_dir/compose.requirements-kroki-latex.yml" "$@"
-  fi
-
-  # These arguments are prepended, so add Kroki overlays first. The resulting
-  # Compose order must be base -> Requirements -> shared DB/proxy -> Kroki ->
-  # Requirements+Kroki, otherwise the base Kroki overlay can replace the
-  # Requirements build target.
-  if [ "$kroki_enabled" = true ]; then
-    if [ "$variant" = requirements ]; then
-      set -- -f "$deployment_repository_dir/compose.requirements-kroki.yml" "$@"
-    fi
-    set -- -f "$deployment_repository_dir/compose.kroki.yml" "$@"
-  fi
+  # Only compose.requirements.yml changes the image; the overlays of the
+  # plugin sets only add services, so their order does not matter. Arguments
+  # are prepended, so the last one added comes first.
+  for compose_overlay in $(catalog_option_compose_files "$deployment_catalog" "$compose_plugins" | sort -r); do
+    set -- -f "$deployment_repository_dir/$compose_overlay" "$@"
+  done
 
   if [ "$proxy_mode" = shared ]; then
     set -- -f "$deployment_repository_dir/compose.proxy.yml" "$@"

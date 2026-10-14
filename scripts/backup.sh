@@ -26,7 +26,12 @@ cosmosys_req_revision=
 if [ "$variant" = requirements ]; then
   cosmosys_req_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-req.revision)
 fi
-cosmosys_poris_revision=$(deployment_container_label "$redmine_container" eu.cosmobots.cosmosys-poris.revision)
+
+# The optional plugin sets the container was started with, and the tools of
+# its image (see plugins.conf).
+plugin_sets=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$redmine_container" |
+  sed -n 's/^COSMOSYS_PLUGINS=//p' | tail -n 1)
+tool_groups=$(deployment_container_label "$redmine_container" eu.cosmobots.tools)
 
 if [ "$cosmosys_revision" = unknown ]; then
   echo "Warning: the running Redmine image has no revision labels; rebuild it to record source revisions." >&2
@@ -69,10 +74,9 @@ deployment_compose exec -T redmine \
   if [ -n "$cosmosys_req_revision" ]; then
     echo "cosmosys_req_revision=$cosmosys_req_revision"
   fi
-  if [ "$cosmosys_poris_revision" != unknown ]; then
-    echo "cosmosys_poris_revision=$cosmosys_poris_revision"
-  fi
   echo "rspreadsheet_revision=$rspreadsheet_revision"
+  echo "plugin_sets=$plugin_sets"
+  echo "tool_groups=$tool_groups"
 } >"$temporary_directory/manifest.env"
 
 (
