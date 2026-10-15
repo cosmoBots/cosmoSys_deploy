@@ -471,9 +471,14 @@ migrated_plugins=$(for plugin in $(catalog_option_plugins "$deployment_catalog" 
   deployment_compose exec -T redmine sh -c "ls plugins/$plugin/db/migrate/*.rb" >/dev/null 2>&1 && echo "$plugin"
 done | catalog_join ' ')
 instance_runner "%w[$migrated_plugins].each { |plugin| abort(\"#{plugin} has no migration applied\") unless ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin}'\").to_i.positive? }"
-if [ "$migration_set" = tags ]; then
-  instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); page.tag_list = 'update-validation'; page.save!"
-fi
+case "$migration_set" in
+  adr)
+    instance_runner "admin = User.find_by_login('admin'); User.current = admin; project = Project.new(name: 'ADR update validation', identifier: 'adr-update-validation', cscode: 'ADRUPD'); project.csys_modules_explicit = '1'; project.enabled_module_names = %w[issue_tracking adrs]; project.save!; adr = Issue.find(Issue.create!(project: project, tracker: CosmosysAdr.tracker, author: admin, subject: 'Update validation decision').id); adr.init_journal(admin); adr.status = CosmosysAdr.status(:accepted); adr.save!"
+    ;;
+  tags)
+    instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); page.tag_list = 'update-validation'; page.save!"
+    ;;
+esac
 
 echo "Checking that a plugin with migrations is not turned off without consent..."
 update_status=0
@@ -493,9 +498,14 @@ instance_runner "%w[$migrated_plugins].each { |plugin| abort(\"the migrations of
 
 echo "Turning the $migration_set plugin set on again..."
 update --pins "$validation_directory/target.env" --plugins "$migration_set"
-if [ "$migration_set" = tags ]; then
-  instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); abort('the tags did not come back') unless page.tag_list.include?('update-validation')"
-fi
+case "$migration_set" in
+  adr)
+    instance_runner "adr = Project.find_by!(identifier: 'adr-update-validation').issues.find_by!(adr_number: 1); abort('the ADR did not come back accepted') unless adr.cosmosys_adr_status_key == :accepted && adr.adr_date; adr.subject = 'Changed after the update'; abort('the ADR is not locked again') if adr.save"
+    ;;
+  tags)
+    instance_runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); abort('the tags did not come back') unless page.tag_list.include?('update-validation')"
+    ;;
+esac
 update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal >/dev/null
 
 echo "Checking that the switches from before plugins.conf are refused..."

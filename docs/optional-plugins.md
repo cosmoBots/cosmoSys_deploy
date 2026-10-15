@@ -161,6 +161,11 @@ with a macro of the set stays as text, and tags stay in their tables, unseen,
 until the set is turned on again. PORIS projects keep the `poris` profile,
 which nothing registers once the set is off: they can be read and their items
 edited, but their settings cannot be saved and no item can be added to them.
+ADRs stay as issues of the `csAdr` tracker: while `adr` is off, cosmoSys shows
+them in the tree and the report like any other item, `ADR#N` stays as text and
+nothing locks a decided ADR. An issue added to that tracker meanwhile has no
+ADR number and cannot be saved once the set is on again; delete it and create
+it again as an ADR.
 The updater refuses to turn off a plugin with database migrations applied
 unless `--allow-plugin-removal` is passed, and never runs the migrations of a
 plugin backwards.

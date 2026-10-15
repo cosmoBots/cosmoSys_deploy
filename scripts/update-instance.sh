@@ -560,6 +560,14 @@ if ! deployment_compose exec -T redmine bundle exec rails runner \
   update_failed "The updated instance does not register exactly the expected plugins."
 fi
 case ",$target_plugins," in
+  *,adr,*)
+    if ! deployment_compose exec -T redmine bundle exec rails runner \
+      "abort('the csAdr tracker is missing') unless CosmosysAdr.tracker; missing = CosmosysAdr::STATUS_KEYS.reject { |key| CosmosysAdr.status(key) }; abort(\"ADR statuses are missing: #{missing.join(', ')}\") unless missing.empty?; abort('the adr item kind is not registered by cosmosys_adr') unless Cosmosys::ItemKindRegistry.registered?('adr') && Cosmosys::ItemKindRegistry.fetch('adr').provider == :cosmosys_adr"; then
+      update_failed "The updated instance does not provide ADRs."
+    fi
+    ;;
+esac
+case ",$target_plugins," in
   *,kroki,*)
     if ! deployment_compose exec -T redmine bundle exec rails runner \
       "abort('Redmine-Kroki settings compatibility initializer is missing') unless Setting.singleton_class.ancestors.include?(RedmineKrokiSettingsCompatibility::SettingPatch); settings = Setting.plugin_redmine_kroki; abort('Redmine-Kroki settings are not readable by symbol key') unless settings[:kroki_url] == settings['kroki_url']"; then

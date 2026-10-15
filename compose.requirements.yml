@@ -1,5 +1,5 @@
 x-requirements-image: &requirements-image
-  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:965eaf7-64f584b-cf55a326f5b8-redmine-7.0.1}
+  image: ${COSMOSYS_REQ_IMAGE:-cosmobots/cosmosys-req:965eaf7-64f584b-1e6c2bf60c19-redmine-7.0.1}
   build:
     args:
       COSMOSYS_VARIANT: requirements
