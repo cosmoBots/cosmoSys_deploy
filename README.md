@@ -535,5 +535,5 @@ composition from `.env` gives the process `COSMOSYS_VARIANT=requirements`
 instead.
 
 - Copyright and authorship: cosmoBots.eu
-- Contact: txinto@elporis.com
+- Contact: cosmosys@elporis.com
 - Licence: GNU General Public License version 3; see `LICENSE`.
