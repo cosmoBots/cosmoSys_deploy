@@ -16,7 +16,7 @@ unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_REVISION COSMOSYS_REQ_REVISION RSPREADSHEET_REVISION \
   COSMOSYS_IMAGE COSMOSYS_REQ_IMAGE COSMOSYS_UPDATE_MODE \
   COSMOSYS_PLUGINS COSMOSYS_TOOLS COSMOSYS_KROKI_ENABLED COSMOSYS_LATEX_ENABLED \
-  COSMOSYS_NOTEBOOK_PREVIEW_ENABLED COSMOSYS_PORIS_ENABLED
+  COSMOSYS_NOTEBOOK_PREVIEW_ENABLED COSMOSYS_PORIS_ENABLED COSMOSYS_COMPOSE_OVERLAYS
 
 suffix=$$
 validation_directory=$(mktemp -d)
@@ -83,8 +83,19 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 umask 077
+# An overlay of the host, next to the instance file as an operator would keep
+# it, which every recreation has to carry, the way back included.
+mkdir "$COSMOSYS_INSTANCES_DIR/overlays"
+cat >"$COSMOSYS_INSTANCES_DIR/overlays/probe.yml" <<EOF
+services:
+  redmine:
+    labels:
+      eu.cosmobots.validation.overlay: probe-$suffix
+EOF
+
 cat >"$COSMOSYS_ENV_FILE" <<EOF
 COMPOSE_PROJECT_NAME=csys_update_validation_$suffix
+COSMOSYS_COMPOSE_OVERLAYS=overlays/probe.yml
 COSMOSYS_VARIANT=requirements
 COSMOSYS_UPDATE_MODE=manual
 POSTGRES_DB=csys_update_validation
@@ -141,6 +152,14 @@ instance_setting() {
   sed -n "s/^$1=//p" "$COSMOSYS_ENV_FILE" | tail -n 1
 }
 
+check_overlay() {
+  if [ "$(deployment_container_label "$(deployment_compose ps -q redmine)" \
+    eu.cosmobots.validation.overlay)" != "probe-$suffix" ]; then
+    echo "The instance lost the overlay of the host $1" >&2
+    exit 1
+  fi
+}
+
 set_instance_value() {
   awk -v key="$1" -v value="$2" '
     index($0, key "=") == 1 {
@@ -157,6 +176,7 @@ if ! deployment_compose up -d --wait --build redmine; then
   deployment_compose logs --no-color --tail 100 migrate bootstrap redmine >&2 || true
   exit 1
 fi
+check_overlay "on its first start"
 
 instance_runner "
   User.create!(
@@ -216,6 +236,11 @@ if git -C "$deployment_repository_dir" rev-parse --git-dir >/dev/null 2>&1; then
   fi
   if ! grep -q "^Declared: cosmobots/cosmosys-req:" "$validation_directory/git.log"; then
     echo "--source HEAD did not read the image name declared by the checkout" >&2
+    cat "$validation_directory/git.log" >&2
+    exit 1
+  fi
+  if ! grep -q "^Overlays: /.*/overlays/probe\.yml$" "$validation_directory/git.log"; then
+    echo "--check did not report the overlay of the host" >&2
     cat "$validation_directory/git.log" >&2
     exit 1
   fi
@@ -305,6 +330,22 @@ if [ "$update_status" -ne 3 ]; then
   exit 1
 fi
 
+echo "Checking that a missing overlay is a configuration error..."
+set_instance_value COSMOSYS_COMPOSE_OVERLAYS overlays/missing.yml
+update_status=0
+update --pins "$validation_directory/target.env" --yes >/dev/null 2>&1 ||
+  update_status=$?
+set_instance_value COSMOSYS_COMPOSE_OVERLAYS overlays/probe.yml
+if [ "$update_status" -ne 2 ]; then
+  echo "An instance naming a missing overlay returned $update_status instead of 2" >&2
+  exit 1
+fi
+if [ "$(running_revision)" != "$baseline_revision" ]; then
+  echo "An instance naming a missing overlay was updated anyway" >&2
+  exit 1
+fi
+check_overlay "when it named a missing one"
+
 echo "Checking that a manual instance is not updated without --yes..."
 update_status=0
 update --pins "$validation_directory/target.env" || update_status=$?
@@ -353,6 +394,7 @@ if [ "$(instance_setting COSMOSYS_REQ_IMAGE)" != "$target_req_image" ]; then
   echo "The Requirements image was not pinned in the environment file" >&2
   exit 1
 fi
+check_overlay "in the update"
 if [ -z "$(find "$COSMOSYS_BACKUP_ROOT" -name manifest.env -print 2>/dev/null | head -n 1)" ]; then
   echo "The update did not leave a backup behind" >&2
   exit 1
@@ -388,6 +430,7 @@ if [ "$(running_revision)" != "$target_revision" ]; then
   echo "A failed update left the instance on another revision" >&2
   exit 1
 fi
+check_overlay "on the way back from a failed update"
 instance_runner "
   abort('the seeded user did not survive the failed update') unless
     User.find_by(login: 'update_validation')
@@ -442,6 +485,7 @@ if [ "$(running_plugin_sets)" != "$tool_set" ] || [ "$(instance_setting COSMOSYS
   echo "A failed change of plugin sets did not go back to $tool_set" >&2
   exit 1
 fi
+check_overlay "on the way back from a failed change of plugin sets"
 
 echo "Turning the $tool_set plugin set off again..."
 update --pins "$validation_directory/target.env" --plugins ''

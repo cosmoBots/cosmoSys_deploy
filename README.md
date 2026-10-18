@@ -497,12 +497,100 @@ public HTTPS address, unless an administrator has already changed them. A
 wildcard DNS record such as `*.csys.example.org` lets new instances go live
 without further DNS changes.
 
-Validate routing, route removal and the isolation of the Docker API with a
-disposable proxy and instance:
+Validate routing, route removal, the isolation of the Docker API and blocking
+through instance overlays with a disposable proxy and instance:
 
 ```sh
 ./scripts/validate-proxy.sh
 ```
+
+## Instance overlays
+
+An instance can add Compose files of its own host after the files of this
+repository, for settings that belong to whoever runs that host rather than to
+this deployment: a block of address ranges at the reverse proxy, a longer log
+retention, resource limits, or an extra network to reach an internal service.
+List them in the instance environment file, separated by commas:
+
+```sh
+COSMOSYS_COMPOSE_OVERLAYS=overlays/block-crawler.yml
+```
+
+A relative path is taken from the directory of the environment file, so for
+`/srv/cosmosys/alpha.env` the line above names
+`/srv/cosmosys/overlays/block-crawler.yml`; absolute paths work too. Every
+script that runs Compose for an instance adds them last, in the order listed,
+so they can change anything the files of this repository declare and no
+recreation through the scripts drops them. That covers `compose.sh`,
+`update-instance.sh` and its way back, `restore.sh`, `backup.sh`,
+`bootstrap-content.sh` and `audit-trees.sh`. A listed file that does not exist
+stops those scripts with status 2 before anything is touched, rather than
+letting the instance start without it. `update-instance.sh` names the overlays
+in its report. Without the setting nothing changes. Direct `docker compose`
+commands must name the overlays as well, after every other file, or a
+recreation drops them; `compose.sh config` shows the result of the merge.
+
+Overlays are not part of this repository and it does not version them. Keep
+them next to the instance environment files, for instance in an `overlays`
+directory beside them, and back them up together, since `backup.sh` holds
+neither. Several instances can name the same file, which is how one block
+reaches every instance of a host that lists it; it does not reach the other
+sites the proxy serves, such as those of another deployment. A change to that
+file reaches each instance when it is next recreated.
+
+For example, this overlay refuses two address ranges at the shared reverse
+proxy:
+
+```yaml
+services:
+  redmine:
+    labels:
+      caddy.@blocked_crawler.remote_ip: 203.0.113.0/24 198.51.100.0/24
+      caddy.respond_1: "@blocked_crawler 403"
+```
+
+A matcher takes any number of ranges, separated by spaces. `remote_ip` compares
+the address of the connection that reaches Caddy, which is the client's because
+the proxy publishes its ports itself; behind a CDN or another proxy it would be
+that proxy's address, and the matcher would have to be `client_ip` with
+`trusted_proxies` set in the proxy.
+
+Compose merges labels by key, so when two overlays set the same label only the
+last value survives, without any warning. Give every block its own matcher name
+and its own number after `respond_`, which caddy-docker-proxy drops when it
+writes the directive: two plain `caddy.respond` labels would leave only the
+last block in force.
+
+Caddy labels only act on an instance published through the shared reverse
+proxy (`COSMOSYS_PROXY_MODE=shared`). Without the `caddy` label that mode adds,
+a proxy on the host reads them as global options and discards them as invalid,
+so the block does nothing. caddy-docker-proxy also drops a whole site when its
+labels do not form a valid configuration: a misspelt matcher, for instance,
+takes the instance off the proxy rather than just its block, while the other
+sites keep working. In both cases the only trace is a `Removing invalid block`
+line in the proxy logs.
+
+Labels take effect when the container is recreated, which the next update does.
+Recreating it discards its `docker logs`, so save them first if they may be
+needed, for instance to study the traffic that led to the block. To apply the
+labels at once, and then check the proxy logs and that the site still answers:
+
+```sh
+COSMOSYS_ENV_FILE=/srv/cosmosys/alpha.env \
+  ./scripts/compose.sh up -d --no-deps redmine
+docker compose -f proxy/compose.yml logs --since 5m caddy | grep 'invalid block'
+curl -sI https://alpha.csys.example.org/
+```
+
+An overlay must not change the image, the build or the command of `redmine`:
+`update-instance.sh` identifies the version of an instance by its image, and an
+overlay that replaced it would make the instance report one version while
+running another. Relative paths inside an overlay, such as the source of a bind
+mount, are resolved from this repository, so give them as absolute paths.
+
+`scripts/validate-proxy.sh` combines two block overlays, and
+`scripts/validate-update.sh` checks that an overlay survives an update and the
+way back from a failed one.
 
 ## Periodic item-tree audit
 

@@ -52,7 +52,11 @@ can only be undone from a backup.
    environment file through the same resolution the other scripts use, so a
    shell variable that contradicts the file is an error rather than a silent
    choice. The `redmine` container must be running; otherwise the script stops
-   without doing anything.
+   without doing anything. The overlays of the host that the file lists
+   (`COSMOSYS_COMPOSE_OVERLAYS`) join every Compose command from here on, the
+   recreation and the way back included, so an update never drops them; a
+   listed overlay that does not exist stops the script as a configuration
+   error.
 2. **Read what runs.** The revisions come from the labels of the running
    container and the plugin sets from its environment, not from any
    configuration file, because an environment file can already name a version
@@ -163,11 +167,11 @@ a deliberate decision: the update never restores the database by itself.
 0.1.0 to 0.1.1 path has a validation of its own. Updating in steps is safer
 than updating across a year of releases in one go.
 
-**The backup does not contain the instance environment file.** It holds the
-database, the file store and a manifest, but not the secrets of the instance.
-Losing `REDMINE_SECRET_KEY_BASE` invalidates sessions rather than data, and
-`POSTGRES_PASSWORD` can be set again on the database server, but those files
-deserve their own backup.
+**The backup does not contain the instance environment file** nor the overlays
+it lists. It holds the database, the file store and a manifest, but not the
+secrets of the instance. Losing `REDMINE_SECRET_KEY_BASE` invalidates sessions
+rather than data, and `POSTGRES_PASSWORD` can be set again on the database
+server, but those files deserve their own backup.
 
 Two things that are not data loss but are worth knowing: the instance is out of
 service from the recreation until it is healthy again, and nothing is written
@@ -221,9 +225,10 @@ failed after changing something, a usage or configuration error, a refusal, an
 update already running, an update available, nothing to report.
 
 The directory is the one the units use, so it holds one environment file per
-instance and nothing else. For scheduled updates there is no need for this
-script: one timer per instance does the same thing, spread over the hour by
-`RandomizedDelaySec`.
+instance and no other `.env` file. Other files, such as the overlays the
+instances list or a directory holding them, are left alone. For scheduled
+updates there is no need for this script: one timer per instance does the same
+thing, spread over the hour by `RandomizedDelaySec`.
 
 ## One update at a time
 
