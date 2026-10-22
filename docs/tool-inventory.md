@@ -62,9 +62,18 @@ explicitly. Audio and transcripts are local private data; define retention
 before regular use. These tools do not implement browser dictation, SSO, LDAP,
 speaker identification or phonetic IPA transcription.
 
+## Verification recorded on 2026-10-23
+
+The full `scripts/validate-deployment.sh requirements exchange` run completed
+successfully in a disposable VM deployment: image build, migrations, bootstrap,
+healthy application and upstream runner checks. The normal installed instance
+was not changed. Python unit tests pass: 2 manager tests, 9 exchange/REST tests,
+and 3 dictation tests with mocked audio. Plugin service/API coverage has 17
+passing assertions. CI has been added; its remote result must be checked separately.
+
 ## Release gates still open
 
-- Build the complete deployment images and run upstream deployment/restore suites.
+- Validate the base variant and backup/restore suites; requirements+exchange passed.
 - Exercise GUI workflows, clean installation, Word copy/paste and hierarchy round trips.
 - Exercise real microphone/GPU inference on a fresh installation; the unit tests mock audio.
 - Review service-account delegation, cross-project permissions and semantic audit history.
