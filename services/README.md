@@ -1,5 +1,25 @@
 # Local inference service — experimental v0.1
 
+## Desktop integration
+
+The versioned `clients/IA-local/actas.py` and `dictado.py` support
+`AUTHORING_SERVICES=1`. Set the service token files described below and start
+the three services before launching the desktop client. `MINUTES_URL` and
+`PUBLICATION_URL` default to loopback ports 3131 and 3132.
+Acta generation goes through minutes REST; reviewed acta/dictation publication
+goes through publication REST. Project listing still uses the existing Redmine
+read adapter; audio transcription still calls local Whisper directly.
+Without this explicit switch the previous desktop implementation remains active.
+No files in an existing installed copy are automatically replaced.
+
+On 2026-10-23, `python services/smoke_local_model.py` passed using real local
+Ollama qwen3:8b through both HTTP services and the desktop service client.
+Publication used an in-memory destination and verified retry behavior. No real
+Redmine write was performed: permissions, formatting and remote conflicts still
+need a dedicated disposable Redmine integration test. Unit suites: 16 service
+tests plus 5 desktop dictation/client tests passed. The synthetic smoke test is
+explicit and not part of ordinary CI, which must not depend on a GPU/model.
+
 Independent Python 3.12 process, standard library only. The HTTP layer has no
 GPU dependency; the configured Ollama server owns model execution. No models
 are downloaded and no Ollama process is started automatically.

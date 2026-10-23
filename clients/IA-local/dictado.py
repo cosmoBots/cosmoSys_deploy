@@ -78,6 +78,10 @@ def build_content(title, text, original, mode):
 
 
 def publish(service, identifier, content, session):
+    if actas.os.environ.get('AUTHORING_SERVICES') == '1':
+        import service_client
+        return service_client.publish_reviewed(service, identifier, content,
+            'dictation-'+session+'-'+hashlib.sha256(content.encode()).hexdigest())
     # Stable page per payload: retry after an uncertain response cannot duplicate it.
     digest = hashlib.sha256((service + '\0' + identifier + '\0' + content).encode()).hexdigest()[:16]
     page = 'Dictado_' + session + '_' + digest

@@ -55,6 +55,14 @@ def projects(service):
 
 
 def publish(service, identifier, draft, transcript):
+    if os.environ.get('AUTHORING_SERVICES') == '1':
+        import hashlib
+        import service_client
+        content = ('h1. Acta revisada\n\n<pre>\n' + html.escape(draft)
+                   + '\n</pre>\n\nh2. Transcripción\n\n<pre>\n'
+                   + html.escape(transcript) + '\n</pre>')
+        return service_client.publish_reviewed(service, identifier, content,
+                                               'minutes-'+hashlib.sha256(content.encode()).hexdigest())
     from urllib.parse import quote
     page = "Acta_" + time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8]
     prefix = "/projects/" + quote(identifier, safe="") + "/wiki/" + page
@@ -114,6 +122,9 @@ def transcribe(filename):
 
 
 def minutes(text):
+    if os.environ.get('AUTHORING_SERVICES') == '1':
+        import service_client
+        return service_client.minutes(text)
     if not text.strip():
         raise ValueError("No hay texto para preparar un acta.")
     # Conservative bound: never silently truncate long meetings.
@@ -235,7 +246,7 @@ def gui():
             busy(lambda: transcribe(filename),
                  lambda segments: replace(transcript, "\n".join(
                      f'[{s["start"]:.1f}–{s["end"]:.1f} s] {s["text"]}' for s in segments)),
-                 "Transcribiendo en la segunda RTX 3090…")
+                 "Transcribiendo con el dispositivo configurado…")
 
     def generate():
         text = transcript.get("1.0", "end").strip()
