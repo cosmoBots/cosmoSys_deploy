@@ -21,7 +21,7 @@ def minutes(text):
     return call('MINUTES','/v1/minutes/draft',{'transcript':text})['text']
 
 
-def transcribe(filename):
+def transcribe(filename,engine='faster-whisper',include_metadata=False):
     path=Path(filename)
     if not 0<path.stat().st_size<=50_000_000:
         raise ValueError('El audio debe ocupar entre 1 y 50.000.000 bytes.')
@@ -29,9 +29,26 @@ def transcribe(filename):
     token=Path(os.environ['TRANSCRIPTION_TOKEN_FILE']).read_text().strip()
     url=os.environ.get('TRANSCRIPTION_URL','http://127.0.0.1:3133').rstrip('/')
     request=Request(url+'/v1/transcriptions',audio,{'Content-Type':'application/octet-stream',
-                    'Authorization':'Bearer '+token})
+                    'Authorization':'Bearer '+token,'X-Transcription-Engine':engine})
     with urlopen(request,timeout=1800) as response:
-        return json.load(response)['segments']
+        result=json.load(response)
+        return result if include_metadata else result['segments']
+
+
+def transcription_engines():
+    return transcription_request('/v1/transcription-engines')
+
+
+def retry_transcription(audio_id,engine):
+    return transcription_request('/v1/transcriptions/retry',{'audio_id':audio_id,'engine':engine})
+
+
+def transcription_request(path,data=None):
+    token=Path(os.environ['TRANSCRIPTION_TOKEN_FILE']).read_text().strip()
+    url=os.environ.get('TRANSCRIPTION_URL','http://127.0.0.1:3133').rstrip('/')
+    request=Request(url+path,None if data is None else json.dumps(data).encode(),
+        {'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+    with urlopen(request,timeout=1800) as response:return json.load(response)
 
 
 def publish_reviewed(service, project, content, request_id):

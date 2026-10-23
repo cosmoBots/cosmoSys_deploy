@@ -991,6 +991,15 @@
                           }
                         }
                       }
+                    },
+                    "audio_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "engine": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1101,6 +1110,255 @@
                 }
               }
             }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Transcription-Engine",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "default": "faster-whisper"
+            }
+          }
+        ]
+      }
+    },
+    "/v1/transcriptions/retry": {
+      "post": {
+        "servers": [
+          {
+            "url": "http://127.0.0.1:3133"
+          }
+        ],
+        "summary": "Retry archived audio with a registered engine",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "audio_id",
+                  "engine"
+                ],
+                "properties": {
+                  "audio_id": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  },
+                  "engine": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Segments and timestamps; requires human review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "segments",
+                    "language",
+                    "review_required"
+                  ],
+                  "properties": {
+                    "language": {
+                      "const": "es"
+                    },
+                    "review_required": {
+                      "const": true
+                    },
+                    "segments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "start",
+                          "end",
+                          "text"
+                        ],
+                        "properties": {
+                          "start": {
+                            "type": "number"
+                          },
+                          "end": {
+                            "type": "number"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "audio_id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Authentication, request, busy or provider error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Archive unavailable"
+          }
+        },
+        "operationId": "retryTranscription"
+      }
+    },
+    "/v1/transcription-engines": {
+      "get": {
+        "operationId": "listTranscriptionEngines",
+        "summary": "Configured providers, not a readiness check",
+        "servers": [
+          {
+            "url": "http://127.0.0.1:3133"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Registered engines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "default": {
+                      "type": "string"
+                    },
+                    "provider_checked": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }
