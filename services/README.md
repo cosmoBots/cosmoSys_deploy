@@ -1,5 +1,10 @@
 # Local inference service — experimental v0.1
 
+The machine-readable API contract is `services/openapi.json` (OpenAPI 3.1).
+Each operation specifies its service port. Supply that service's bearer token.
+This contract can be imported into API clients or rendered by an OpenAPI viewer;
+it does not expose credentials or start an HTTP documentation server.
+
 ## Local launcher
 
 `python services/start_local.py /private/launcher.json --app actas` starts the
