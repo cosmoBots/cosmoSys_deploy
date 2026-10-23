@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 from http.server import ThreadingHTTPServer
 from inference_server import handler as base_handler
+from audio_archive import AudioArchive
 
 MAX_AUDIO=50_000_000
 
@@ -33,7 +34,7 @@ class Whisper:
         return [{'start':s.start,'end':s.end,'text':s.text.strip()} for s in segments]
 
 
-def handler(provider,token):
+def handler(provider,token,archive=None):
     gate=threading.BoundedSemaphore(1)
     class Handler(base_handler(None,token)):
         def do_POST(self):
@@ -46,6 +47,7 @@ def handler(provider,token):
             if not 0<size<=MAX_AUDIO or self.headers.get('Transfer-Encoding'):
                 return self.reply(413,{'error':'invalid_body_size'})
             if not gate.acquire(blocking=False):return self.reply(429,{'error':'busy'})
+            audio_id=None
             try:
                 with tempfile.TemporaryDirectory(prefix='transcription-') as folder:
                     path=Path(folder)/'audio'
@@ -55,10 +57,14 @@ def handler(provider,token):
                             block=self.rfile.read(min(65536,remaining))
                             if not block:raise ValueError('Incomplete audio')
                             file.write(block);remaining-=len(block)
-                    segments=provider.transcribe(str(path))
-                    self.reply(200,{'segments':segments,'language':'es','review_required':True})
-            except (ValueError,socket.timeout):self.reply(422,{'error':'invalid_audio'})
-            except Exception:self.reply(502,{'error':'transcription_failed'})
+                    if archive is not None:
+                        audio_id=archive.save(path)
+                        segments=archive.transcribe(audio_id,'faster-whisper',{'faster-whisper':provider})
+                    else:
+                        segments=provider.transcribe(str(path))
+                    self.reply(200,{'segments':segments,'language':'es','review_required':True,'audio_id':audio_id})
+            except (ValueError,socket.timeout):self.reply(422,{'error':'invalid_audio','audio_id':audio_id})
+            except Exception:self.reply(502,{'error':'transcription_failed','audio_id':audio_id})
             finally:gate.release()
     return Handler
 
@@ -68,7 +74,9 @@ def main():
     args=parser.parse_args()
     token=Path(os.environ['TRANSCRIPTION_TOKEN_FILE']).read_text().strip()
     if len(token)<32:raise ValueError('Token must contain at least 32 characters')
-    ThreadingHTTPServer(('127.0.0.1',args.port),handler(Whisper(),token)).serve_forever()
+    archive=AudioArchive(os.environ.get('TRANSCRIPTION_DATA_DIR',
+        str(Path(__file__).resolve().parent/'private-audio')))
+    ThreadingHTTPServer(('127.0.0.1',args.port),handler(Whisper(),token,archive)).serve_forever()
 
 
 if __name__=='__main__':main()
