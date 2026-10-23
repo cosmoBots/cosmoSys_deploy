@@ -1,4 +1,5 @@
 from application import *
+from academic_format import apply_base_format
 
 def handler(application):
     class Handler(BaseHTTPRequestHandler):
@@ -45,7 +46,13 @@ def handler(application):
                         if args.get('node'):b=bridge.branch(s,args['node'][0]) if args['node'][0] in {r['key'] for r in b['records']} else None
                         if not b:raise ValueError('Rama no válida.')
                         with tempfile.TemporaryDirectory() as td:
-                            f=Path(td)/'documento.docx';bridge.write_docx(b,f);raw=f.read_bytes()
+                            f=Path(td)/'documento.docx';bridge.write_docx(b,f)
+                            profile=args.get('profile',['standard'])[0]
+                            if profile not in ('standard','academic-base'):raise ValueError('Perfil desconocido.')
+                            if profile=='academic-base':
+                                if application.mode!='academico':raise ValueError('Perfil exclusivo del gestor académico.')
+                                apply_base_format(f)
+                            raw=f.read_bytes()
                     self.send(200,raw,'application/vnd.openxmlformats-officedocument.wordprocessingml.document',{'Content-Disposition':'attachment; filename="documento.docx"'})
                 except Exception as e:self.send(400,{'error':str(e)})
                 return

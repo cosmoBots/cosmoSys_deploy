@@ -24,4 +24,17 @@ $('save-notes').onclick=()=>run(async()=>{const data={};document.querySelectorAl
 $('add').onclick=()=>run(async()=>{if(!canLeave())return;const payload={work:work.id,parent:node.key,title:$('child-title').value};const r=await api('/api/node',{...payload,token:requestToken('node',payload)});requests.delete('node');$('child-title').value='';await loadWork(work.id,r.key);});
 $('preview').onclick=()=>run(async()=>{const file=$('import-file').files[0];if(!file)throw Error('Selecciona un Word corregido.');if(file.size>15000000)throw Error('El Word supera los 15 MB.');const raw=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<raw.length;i+=8192)binary+=String.fromCharCode(...raw.subarray(i,i+8192));const result=await api('/api/import-preview',{work:work.id,file:btoa(binary)});pending=result.token;$('diff').textContent=result.changes.map(c=>(c.create?'APARTADO NUEVO':'MODIFICACIÓN')+' · '+(c.after.subject||c.key)+'\n'+Object.entries(c.after).map(([k,v])=>k+'\nANTES: '+(c.before[k]||'')+'\nDESPUÉS: '+v).join('\n')).join('\n\n')||'No hay cambios.';$('apply').hidden=!result.changes.length;status('Revisa todos los cambios antes de aplicarlos.');});
 $('apply').onclick=()=>run(async()=>{if(!canLeave())return;const result=await api('/api/import-apply',{work:work.id,token:pending});await loadWork(work.id);status('Importación confirmada: '+result.changed.length+' apartados.');});
-run(init);
+run(async()=>{
+ await init();
+ if(mode==='academico'){
+  const button=document.createElement('button');
+  button.textContent='Exportar formato académico base (experimental)';
+  button.onclick=()=>{
+   if(!work)return;
+   if(dirtyText||dirtyNotes){status('Guarda los cambios antes de exportar.',true);return;}
+   window.location.href='/export?work='+encodeURIComponent(work.id)+'&profile=academic-base';
+  };
+  $('export-node').after(button);
+  $('format-note').textContent='Formato académico base: Times New Roman 12, doble espacio, márgenes de 2,54 cm y sangría inicial. Conserva el intercambio reversible. No es todavía un documento APA7 completo: faltan portada, paginación, formato completo de títulos, referencias y requisitos de tu universidad.';
+ }
+});
