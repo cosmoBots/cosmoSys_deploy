@@ -1,5 +1,18 @@
 # Local inference service — experimental v0.1
 
+## Local launcher
+
+`python services/start_local.py /private/launcher.json --app actas` starts the
+three authenticated loopback services and opens the configured desktop app.
+Use `--app dictado` for dictation, or omit it to start services only.
+The private JSON has `environment` (the token/config path variables below),
+`client_python` (Python executable) and `client_directory` (desktop client folder).
+Set Redmine project-list credentials in that environment as well.
+Keep this file and all secrets outside Git and restrict OS access to the user.
+The launcher reuses authenticated healthy services; it does not install a
+Windows service, auto-start at login, or restart running services after updates.
+Close/restart the processes deliberately when changing configuration/code.
+
 ## Real Redmine integration validation
 
 On 2026-10-23, `validate_redmine.py` passed against the disposable

@@ -16,3 +16,4 @@ clients/**/dictados/
 clients/**/*.wav
 clients/**/recuperacion/
 services/**/__pycache__/
+**/private-services/
