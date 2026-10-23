@@ -1,5 +1,32 @@
 # Local inference service — experimental v0.1
 
+## Transcription service
+
+`python services/transcription_server.py --port 3133` exposes authenticated
+`POST /v1/transcriptions` with a raw `application/octet-stream` audio body.
+Set `TRANSCRIPTION_TOKEN_FILE` (32+ characters) and `WHISPER_CACHE` to the
+pre-downloaded model cache. The service needs faster-whisper and its runtime
+dependencies; the desktop REST client does not. Device/model/index/precision
+are configured with the existing WHISPER_* variables. CPU and alternative GPUs
+are configurable, not all tested. No automatic downloads occur.
+
+Responses contain segments with start/end seconds and text, language `es`,
+and review_required=true. Audio is limited to 50 MB, processed serially and
+stored temporarily, then deleted on normal completion/error. Process crashes
+may leave temporary files. There is no duration limit, queue or cancellation;
+compressed long audio can occupy the worker for a long time. The loaded model
+stays resident until the process stops. Health does not load the model.
+
+Add TRANSCRIPTION_TOKEN_FILE and WHISPER_CACHE to the launcher's private
+environment. With AUTHORING_SERVICES=1 the installed actas/dictado client sends
+audio to this service (TRANSCRIPTION_URL defaults to loopback port 3133).
+
+Validated on 2026-10-23 with installed client, running HTTP service and real
+Whisper/CUDA: synthetic spoken Spanish was returned as two matching phrases
+with timestamps. 17 service tests passed and the expanded OpenAPI validated.
+Real microphone workflows and alternative CPU/GPU configurations are separate
+checks. No production content was published.
+
 The machine-readable API contract is `services/openapi.json` (OpenAPI 3.1).
 Each operation specifies its service port. Supply that service's bearer token.
 This contract can be imported into API clients or rendered by an OpenAPI viewer;

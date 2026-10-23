@@ -111,6 +111,9 @@ def ensure_server():
 
 
 def transcribe(filename):
+    if os.environ.get('AUTHORING_SERVICES') == '1':
+        import service_client
+        return service_client.transcribe(filename)
     from faster_whisper import WhisperModel
     model = WhisperModel(os.environ.get("WHISPER_MODEL", "large-v3"), device=os.environ.get("WHISPER_DEVICE", "cuda"), device_index=int(os.environ.get("WHISPER_DEVICE_INDEX", "0")),
                          compute_type=os.environ.get("WHISPER_COMPUTE_TYPE", "float16"), local_files_only=True,

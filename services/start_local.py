@@ -35,7 +35,10 @@ def main():
             else:raise RuntimeError('Configured Ollama failed to start')
     for script,port,token_name in [('inference_server.py',3130,'AI_SERVICE_TOKEN_FILE'),
         ('minutes_server.py',3131,'MINUTES_SERVICE_TOKEN_FILE'),
-        ('publication_server.py',3132,'PUBLICATION_TOKEN_FILE')]:
+        ('publication_server.py',3132,'PUBLICATION_TOKEN_FILE'),
+        ('transcription_server.py',3133,'TRANSCRIPTION_TOKEN_FILE')]:
+        if token_name=='TRANSCRIPTION_TOKEN_FILE' and token_name not in env:
+            continue
         token=Path(env[token_name]).read_text().strip()
         def healthy():
             try:
@@ -54,7 +57,7 @@ def main():
     if args.app:
         subprocess.Popen([config['client_python'],str(Path(config['client_directory'])/(args.app+'.py'))],
             env=env,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-    print('Three local services authenticated and ready (model readiness not implied).')
+    print('Configured local services authenticated and ready (model readiness not implied).')
 
 
 if __name__=='__main__':main()
