@@ -36,6 +36,7 @@ ENV RSPREADSHEET_PATH=/opt/rspreadsheet
 # instance activates them; see plugins.conf.
 COPY plugins.conf scripts/catalog-lib.sh docker/install-optional-plugins.sh /opt/cosmosys-deploy/
 COPY kroki_compat /opt/cosmosys/plugins-available/redmine_kroki_compat
+COPY docker/local-plugins/cosmosys_exchange_api /opt/cosmosys/plugins-available/cosmosys_exchange_api
 COPY docker/additional_environment.rb config/additional_environment.rb
 
 RUN sh /opt/cosmosys-deploy/install-optional-plugins.sh \

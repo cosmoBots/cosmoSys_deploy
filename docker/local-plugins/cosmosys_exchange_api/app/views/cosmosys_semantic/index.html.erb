@@ -1,0 +1,32 @@
+<h2>Relaciones de universo y obras</h2>
+<p>Extensión local · Los tipos y relaciones se guardan aparte del texto. Una propuesta no se convierte en canon al importar Word.</p>
+<% if @graph %>
+<details><summary>Asignar o corregir un tipo</summary>
+<p>La revisión actual aparece en la tabla inferior. Usa −1 para una ficha todavía sin tipo. Un cambio incompatible con sus relaciones será rechazado.</p>
+<%= form_tag({action: 'set_type',project_id:@project.identifier}) do %>
+<p><%= label_tag :issue_id,'Número de ficha' %> <%= number_field_tag :issue_id,nil,required:true,min:1 %>
+<%= label_tag :kind,'Tipo' %> <%= select_tag :kind,options_for_select(@graph[:types]) %>
+<%= label_tag :revision,'Revisión actual' %> <%= number_field_tag :revision,-1,required:true %></p>
+<%= submit_tag 'Guardar tipo' %>
+<% end %></details>
+<details><summary>Crear o revisar una relación</summary>
+<p>El origen pertenece a este proyecto. El destino puede estar en otro proyecto si tienes permiso de edición sobre ambas fichas. Para actualizar, usa la misma pareja y relación y su revisión actual; para una nueva, −1. El estado rejected conserva el registro pero desactiva su efecto estructural.</p>
+<%= form_tag({action:'save_link',project_id:@project.identifier}) do %>
+<p><%= label_tag :source_id,'Ficha origen' %> <%= number_field_tag :source_id,nil,required:true,min:1 %>
+<%= label_tag :target_id,'Ficha destino' %> <%= number_field_tag :target_id,nil,required:true,min:1 %></p>
+<p><%= label_tag :predicate,'Relación' %> <%= select_tag :predicate,options_for_select(@graph[:rules].keys) %>
+<%= label_tag :status,'Estado' %> <%= select_tag :status,options_for_select(%w[proposed approved rejected]) %>
+<%= label_tag :revision,'Revisión actual' %> <%= number_field_tag :revision,-1,required:true %></p>
+<p><%= label_tag :provenance,'Procedencia y motivo de la decisión' %><br><%= text_area_tag :provenance,nil,required:true,rows:3,cols:80,maxlength:4000 %></p>
+<p><%= check_box_tag :confirm_approval,'1' %> <%= label_tag :confirm_approval,'Confirmo expresamente la aprobación de esta relación' %></p>
+<%= submit_tag 'Guardar relación' %>
+<% end %></details>
+<h3>Relaciones registradas</h3>
+<table class="list"><thead><tr><th>Origen</th><th>Relación</th><th>Destino</th><th>Estado</th><th>Revisión</th><th>Procedencia</th></tr></thead><tbody>
+<% @graph[:links].each do |l| %><tr><td><%= link_to "##{l[:source_id]}",issue_path(l[:source_id]) %></td><td><%= l[:predicate] %></td><td><%= link_to "##{l[:target_id]}",issue_path(l[:target_id]) %></td><td><%= l[:status] %></td><td><%= l[:revision] %></td><td><%= l[:provenance] %></td></tr><% end %>
+</tbody></table>
+<h3>Fichas y tipos</h3><table class="list"><thead><tr><th>Ficha</th><th>Tipo</th><th>Revisión</th></tr></thead><tbody>
+<% @graph[:nodes].each do |n| %><tr><td><%= link_to "##{n[:id]} #{n[:title]}",issue_path(n[:id]) %></td><td><%= n[:kind] || 'Sin asignar' %></td><td><%= n[:revision] %></td></tr><% end %>
+</tbody></table>
+<details><summary>Tipos admitidos por relación</summary><ul><% @graph[:rules].each do |name,pair| %><li><%= name %>: <%= pair[0].join(', ') %> → <%= pair[1].join(', ') %></li><% end %></ul></details>
+<% end %>

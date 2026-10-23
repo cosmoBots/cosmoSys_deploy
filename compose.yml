@@ -1,7 +1,7 @@
 name: cosmosys
 
 x-redmine-image: &redmine-image
-  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:7d9b82b-645bc33a7028-redmine-7.0.1}
+  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:7d9b82b-5f75c1c8b261-redmine-7.0.1}
   # Images are built here, never pulled: nobody controls the cosmobots
   # namespace of Docker Hub on behalf of this deployment.
   pull_policy: never
