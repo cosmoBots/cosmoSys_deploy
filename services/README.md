@@ -1,5 +1,23 @@
 # Local inference service — experimental v0.1
 
+## Real Redmine integration validation
+
+On 2026-10-23, `validate_redmine.py` passed against the disposable
+semantic-isolated Redmine instance (real Rails/Redmine and PostgreSQL, synthetic
+private project). Checked: preview does not create a wiki page, exact Unicode
+and multiline text preservation, retry reuses the page without a new revision,
+changed content with the same identity is rejected without mutation, and a
+read-only account can read but cannot create a page. Synthetic pages remain in
+the disposable database for inspection. No production project was modified.
+
+Run only on a disposable instance:
+`python services/validate_redmine.py URL PROJECT PRIVATE_KEYS_JSON`.
+The private JSON contains `editor` and `reader` API keys and must stay outside
+the checkout. Provision the writer and read-only member separately. This test
+exercises Publisher and the real REST adapter; HTTP publication ingress is
+covered separately by the unit suite. Multi-process races, production rollout
+and GUI integration are not covered by this check.
+
 ## Desktop integration
 
 The versioned `clients/IA-local/actas.py` and `dictado.py` support
