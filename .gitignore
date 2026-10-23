@@ -1,2 +1,17 @@
 .env
 backups/
+
+# Private state of optional editorial clients
+clients/**/datos/
+clients/**/__pycache__/
+clients/**/.exchange-key
+clients/**/*.sqlite3*
+clients/**/*.docx
+clients/**/*.local.json
+clients/**/models/
+clients/**/venv/
+clients/**/ollama/
+clients/**/logs/
+clients/**/dictados/
+clients/**/*.wav
+clients/**/recuperacion/
