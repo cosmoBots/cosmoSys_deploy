@@ -64,6 +64,47 @@ packaging on a clean machine remain unverified for this service.
 
 ## Contributions
 
+## Publication service (experimental)
+
+Run `python services/publication_server.py --port 3132` with
+`PUBLICATION_TOKEN_FILE` (private bearer token, 32+ characters) and
+`PUBLICATION_CONFIG_FILE` (private JSON outside the repository). Example config:
+
+```json
+{"cosmosys":{"adapter":"redmine-wiki","url":"http://localhost:3080","api_key_file":"/private/redmine-key","projects":["demo"]}}
+```
+
+Add a `cgrol` destination with its URL, credential file and permitted projects
+to use the same Redmine adapter there. Other applications need their own adapter;
+arbitrary destination URLs are not accepted in requests. Use HTTPS for remote
+backends. The local API binds to loopback and requires bearer authentication.
+
+1. POST `/v1/publications/preview` with `destination`, `project`, `text` and
+   `request_id` (all strings). Returns exact text, target wiki page,
+   `content_sha256` and a `review_token` valid for 30 minutes. No remote writes.
+2. Review the returned text and target.
+3. POST `/v1/publications/commit` with that token, hash and `confirmed: true`.
+
+The adapter publishes the exact supplied Redmine wiki source. Clients must
+escape/format untrusted material appropriately before review. Do not submit
+raw model output automatically. A bearer client can assert confirmation;
+the service cannot prove that a human actually reviewed the text.
+
+Page identity derives from destination/project/request_id. Retries with the
+same identity and content reuse the existing page; different content conflicts.
+After restart, preview again with the same request_id. Reviews are memory-only.
+The server serializes local commits; Redmine GET-then-PUT is not a distributed
+atomic create. Run one publisher and reserve the Publication_ page namespace:
+concurrent external writers can race. This is not an exactly-once delivery guarantee.
+It creates wiki pages only, not issues, semantic entities or academic references.
+No real destination has been modified during validation.
+
+Tests: 16 passing across services, including authenticated publication HTTP
+with a fake destination. Real Redmine permissions/network behavior and
+end-to-end UI integration still need separate validation.
+
+## Contribution destination
+
 Development target: `fpgulias/cosmoSys_deploy`, branch
 `development/standalone-services`. Contributors can fork this repository,
 commit their changes and open a PR with that repository/branch as the base.
