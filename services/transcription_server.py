@@ -35,14 +35,15 @@ class Whisper:
         return [{'start':s.start,'end':s.end,'text':s.text.strip()} for s in segments]
 
 
-def handler(provider,token,archive=None,engines=None):
+def handler(provider,token,archive=None,engines=None,default_engine='faster-whisper'):
     engines=dict(engines or {'faster-whisper':provider})
+    if default_engine not in engines:raise ValueError('Unknown default engine')
     gate=threading.BoundedSemaphore(1)
     class Handler(base_handler(None,token)):
         def do_GET(self):
             if self.path=='/v1/transcription-engines':
                 if not self.authorized():return self.reply(401,{'error':'unauthorized'})
-                return self.reply(200,{'engines':list(engines),'default':'faster-whisper',
+                return self.reply(200,{'engines':list(engines),'default':default_engine,
                     'provider_checked':False})
             return super().do_GET()
 
@@ -50,7 +51,7 @@ def handler(provider,token,archive=None,engines=None):
             if not self.authorized():return self.reply(401,{'error':'unauthorized'})
             if self.path=='/v1/transcriptions/retry':return self.retry()
             if self.path!='/v1/transcriptions':return self.reply(404,{'error':'not_found'})
-            engine=self.headers.get('X-Transcription-Engine','faster-whisper')
+            engine=self.headers.get('X-Transcription-Engine',default_engine)
             if engine not in engines:return self.reply(422,{'error':'unknown_engine'})
             if self.headers.get('Content-Type')!='application/octet-stream':
                 return self.reply(415,{'error':'binary_audio_required'})
@@ -74,7 +75,8 @@ def handler(provider,token,archive=None,engines=None):
                         segments=archive.transcribe(audio_id,engine,engines)
                     else:
                         segments=engines[engine].transcribe(str(path))
-                    self.reply(200,{'segments':segments,'language':'es','review_required':True,'audio_id':audio_id,'engine':engine})
+                    self.reply(200,{'segments':segments,'language':'es','review_required':True,'audio_id':audio_id,'engine':engine,
+                        'execution':getattr(engines[engine],'last_metadata',{})})
             except (ValueError,socket.timeout):self.reply(422,{'error':'invalid_audio','audio_id':audio_id})
             except Exception:self.reply(502,{'error':'transcription_failed','audio_id':audio_id})
             finally:gate.release()
@@ -99,7 +101,7 @@ def handler(provider,token,archive=None,engines=None):
             try:
                 segments=archive.transcribe(identity,engine,engines)
                 self.reply(200,{'segments':segments,'language':'es','review_required':True,
-                    'audio_id':identity,'engine':engine})
+                    'audio_id':identity,'engine':engine,'execution':getattr(engines[engine],'last_metadata',{})})
             except FileNotFoundError:self.reply(404,{'error':'audio_not_found','audio_id':identity})
             except ValueError:self.reply(422,{'error':'invalid_audio','audio_id':identity})
             except Exception:self.reply(502,{'error':'transcription_failed','audio_id':identity})
@@ -114,7 +116,14 @@ def main():
     if len(token)<32:raise ValueError('Token must contain at least 32 characters')
     archive=AudioArchive(os.environ.get('TRANSCRIPTION_DATA_DIR',
         str(Path(__file__).resolve().parent/'private-audio')))
-    ThreadingHTTPServer(('127.0.0.1',args.port),handler(Whisper(),token,archive)).serve_forever()
+    engines={'faster-whisper':Whisper()}
+    if os.environ.get('WHISPER_CPP_EXE'):
+        from whisper_cpp import WhisperCpp
+        engines['whisper-cpp-base']=WhisperCpp(os.environ['WHISPER_CPP_EXE'],
+            os.environ['WHISPER_CPP_MODEL'],os.environ['FFMPEG_EXE'],
+            os.environ.get('WHISPER_CPP_DEVICE','auto'))
+    default=os.environ.get('TRANSCRIPTION_DEFAULT_ENGINE','faster-whisper')
+    ThreadingHTTPServer(('127.0.0.1',args.port),handler(engines['faster-whisper'],token,archive,engines,default)).serve_forever()
 
 
 if __name__=='__main__':main()

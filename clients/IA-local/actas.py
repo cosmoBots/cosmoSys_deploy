@@ -270,6 +270,8 @@ def gui():
 
     def transcription_done(result):
         archived['audio_id']=result.get('audio_id')
+        if result.get('execution',{}).get('cpu_fallback'):
+            messagebox.showinfo('Dispositivo','El intento automático falló; la transcripción se completó usando CPU.')
         text='\n'.join(f'[{s["start"]:.1f}–{s["end"]:.1f} s] {s["text"]}' for s in result['segments'])
         # Keep editable text intact until the user explicitly accepts a new result.
         preview=tk.Toplevel(app);preview.title('Nueva transcripción — revisar')
@@ -295,7 +297,7 @@ def gui():
         import service_client
         def loaded(result):
             engine_choice['values']=result['engines']
-            if engine.get() not in result['engines']:engine.set(result['default'])
+            engine.set(result['default'])
         busy(service_client.transcription_engines,loaded,'Consultando motores configurados…')
 
     if service_mode:
@@ -370,6 +372,7 @@ def gui():
                          creationflags=subprocess.CREATE_NO_WINDOW)
     ttk.Button(bar, text='Dictar con micrófono…', command=open_dictation).pack(side='left', padx=4)
     ttk.Label(app, text="Prueba: español, un archivo cada vez. Sin grabación del micrófono ni publicación automática.").pack(pady=6)
+    if service_mode:app.after(300,refresh_engines)
     app.mainloop()
 
 

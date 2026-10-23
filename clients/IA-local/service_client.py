@@ -37,15 +37,16 @@ def minutes(text):
     return call('MINUTES','/v1/minutes/draft',{'transcript':text})['text']
 
 
-def transcribe(filename,engine='faster-whisper',include_metadata=False):
+def transcribe(filename,engine=None,include_metadata=False):
     path=Path(filename)
     if not 0<path.stat().st_size<=50_000_000:
         raise ValueError('El audio debe ocupar entre 1 y 50.000.000 bytes.')
     audio=path.read_bytes()
     token=Path(os.environ['TRANSCRIPTION_TOKEN_FILE']).read_text().strip()
     url=os.environ.get('TRANSCRIPTION_URL','http://127.0.0.1:3133').rstrip('/')
-    request=Request(url+'/v1/transcriptions',audio,{'Content-Type':'application/octet-stream',
-                    'Authorization':'Bearer '+token,'X-Transcription-Engine':engine})
+    headers={'Content-Type':'application/octet-stream','Authorization':'Bearer '+token}
+    if engine:headers['X-Transcription-Engine']=engine
+    request=Request(url+'/v1/transcriptions',audio,headers)
     result=transcription_response(request)
     return result if include_metadata else result['segments']
 
