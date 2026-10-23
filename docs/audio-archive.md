@@ -18,7 +18,8 @@ original ni los resultados anteriores. Antes de cada intento verifica integridad
 Un cierre abrupto puede dejar un intento en estado `running`; aún no hay reconciliación.
 
 Esta entrega conecta el archivo al servidor, pero solo registra el adaptador real
-faster-whisper. Quedan pendientes el selector y reintento desde la interfaz gráfica,
+faster-whisper. El cliente de actas permite consultar motores y reintentar el último
+original de la sesión. Quedan pendientes la recuperación de sesiones anteriores,
 un segundo motor real, metadatos de modelo/dispositivo/duración, vínculo con proyectos
 y actas, y detección GPU con alternativa CPU. Las pruebas de intercambio de proveedores
 usan dobles de prueba, no validan dos motores de IA reales. No modifica las correcciones
@@ -42,3 +43,9 @@ El cliente Python expone `transcription_engines`, `retry_transcription` y
 Validación: prueba HTTP con fallo de proveedor, recuperación con otro proveedor
 simulado, autenticación, identidad inválida, original inexistente e historial.
 El servidor de producción sigue configurando únicamente faster-whisper.
+
+En modo servicios, Actas ofrece «Consultar motores» y «Reintentar original».
+El resultado aparece en una ventana de revisión. Para sustituir una transcripción
+editable ya existente exige guardar primero una copia del texto actual; cancelar
+el guardado conserva el texto anterior. Un fallo HTTP con audio_id mantiene ese
+identificador para reintentar. No se publica ningún resultado automáticamente.

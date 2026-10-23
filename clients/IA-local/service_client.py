@@ -4,6 +4,22 @@ import json
 import os
 from pathlib import Path
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+
+
+class TranscriptionError(RuntimeError):
+    def __init__(self,audio_id=None):
+        self.audio_id=audio_id
+        super().__init__('La transcripción falló. '+('El original está archivado; puedes reintentarlo.' if audio_id else 'No se ha confirmado el archivo del original.'))
+
+
+def transcription_response(request):
+    try:
+        with urlopen(request,timeout=1800) as response:return json.load(response)
+    except HTTPError as exc:
+        try:identity=json.loads(exc.read()).get('audio_id')
+        except (ValueError,AttributeError):identity=None
+        raise TranscriptionError(identity) from exc
 
 
 def call(service, path, data):
@@ -30,9 +46,8 @@ def transcribe(filename,engine='faster-whisper',include_metadata=False):
     url=os.environ.get('TRANSCRIPTION_URL','http://127.0.0.1:3133').rstrip('/')
     request=Request(url+'/v1/transcriptions',audio,{'Content-Type':'application/octet-stream',
                     'Authorization':'Bearer '+token,'X-Transcription-Engine':engine})
-    with urlopen(request,timeout=1800) as response:
-        result=json.load(response)
-        return result if include_metadata else result['segments']
+    result=transcription_response(request)
+    return result if include_metadata else result['segments']
 
 
 def transcription_engines():
@@ -48,7 +63,7 @@ def transcription_request(path,data=None):
     url=os.environ.get('TRANSCRIPTION_URL','http://127.0.0.1:3133').rstrip('/')
     request=Request(url+path,None if data is None else json.dumps(data).encode(),
         {'Authorization':'Bearer '+token,'Content-Type':'application/json'})
-    with urlopen(request,timeout=1800) as response:return json.load(response)
+    return transcription_response(request)
 
 
 def publish_reviewed(service, project, content, request_id):

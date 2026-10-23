@@ -1,10 +1,19 @@
 import hashlib
+import io
+from urllib.error import HTTPError
 import unittest
 from unittest.mock import patch
 import service_client
 
 
 class ClientTests(unittest.TestCase):
+    def test_failed_transcription_retains_archive_identity(self):
+        error=HTTPError('http://localhost',502,'failed',{},io.BytesIO(b'{"audio_id":"original"}'))
+        with patch.object(service_client,'urlopen',side_effect=error):
+            with self.assertRaises(service_client.TranscriptionError) as caught:
+                service_client.transcription_response(object())
+        self.assertEqual('original',caught.exception.audio_id)
+
     def test_mismatched_preview_never_committed(self):
         preview={'text':'changed','content_sha256':'wrong','destination':'cosmosys','project':'demo'}
         with patch.object(service_client,'call',return_value=preview) as call:

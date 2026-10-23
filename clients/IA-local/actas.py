@@ -213,6 +213,14 @@ def gui():
     draft = ScrolledText(app, height=17, wrap="word")
     draft.pack(fill="both", expand=True, padx=12, pady=5)
     controls = []
+    service_mode=os.environ.get('AUTHORING_SERVICES')=='1'
+    archived={'audio_id':None}
+    engine=tk.StringVar(value='faster-whisper')
+    engine_bar=ttk.Frame(app)
+    engine_bar.pack(fill='x',padx=12)
+    ttk.Label(engine_bar,text='Motor de transcripción:').pack(side='left')
+    engine_choice=ttk.Combobox(engine_bar,textvariable=engine,values=['faster-whisper'],state='readonly')
+    engine_choice.pack(side='left',padx=5)
 
     def busy(job, done, label):
         status.set(label)
@@ -222,9 +230,11 @@ def gui():
         def finish(value=None, error=None):
             for button in controls:
                 button.configure(state="normal")
+            engine_choice.configure(state='readonly')
             if error:
+                if getattr(error,'audio_id',None):archived['audio_id']=error.audio_id
                 status.set("No se ha completado la operación.")
-                messagebox.showerror("Actas locales", error)
+                messagebox.showerror("Actas locales", str(error))
             else:
                 done(value)
                 status.set("Listo. Revisa el resultado.")
@@ -234,7 +244,7 @@ def gui():
                 value = job()
                 app.after(0, lambda: finish(value))
             except Exception as exc:
-                error = str(exc)
+                error = exc
                 app.after(0, lambda: finish(error=error))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -246,10 +256,51 @@ def gui():
         filename = filedialog.askopenfilename(title="Elegir grabación", filetypes=[
             ("Audio o vídeo", "*.wav *.mp3 *.m4a *.flac *.ogg *.mp4 *.webm"), ("Todos", "*.*")])
         if filename:
+            if service_mode:
+                import service_client
+                selected=engine.get()
+                archived['audio_id']=None
+                busy(lambda: service_client.transcribe(filename,selected,include_metadata=True),
+                     transcription_done,'Archivando y transcribiendo el audio…')
+                return
             busy(lambda: transcribe(filename),
                  lambda segments: replace(transcript, "\n".join(
                      f'[{s["start"]:.1f}–{s["end"]:.1f} s] {s["text"]}' for s in segments)),
                  "Transcribiendo con el dispositivo configurado…")
+
+    def transcription_done(result):
+        archived['audio_id']=result.get('audio_id')
+        text='\n'.join(f'[{s["start"]:.1f}–{s["end"]:.1f} s] {s["text"]}' for s in result['segments'])
+        # Keep editable text intact until the user explicitly accepts a new result.
+        preview=tk.Toplevel(app);preview.title('Nueva transcripción — revisar')
+        view=ScrolledText(preview,width=100,height=24,wrap='word');view.pack(fill='both',expand=True)
+        view.insert('1.0',text)
+        def accept():
+            if transcript.get('1.0','end').strip():
+                target=filedialog.asksaveasfilename(parent=preview,title='Guardar texto actual antes de sustituirlo',
+                    defaultextension='.txt',filetypes=[('Texto','*.txt')])
+                if not target:return
+                Path(target).write_text(transcript.get('1.0','end'),encoding='utf-8')
+            replace(transcript,view.get('1.0','end').strip());preview.destroy()
+        ttk.Button(preview,text='Usar esta transcripción',command=accept).pack(pady=8)
+
+    def retry_audio():
+        if not archived['audio_id']:
+            messagebox.showinfo('Reintentar','Selecciona primero un audio para archivarlo.');return
+        import service_client
+        identity,selected=archived['audio_id'],engine.get()
+        busy(lambda:service_client.retry_transcription(identity,selected),transcription_done,'Reintentando el original archivado…')
+
+    def refresh_engines():
+        import service_client
+        def loaded(result):
+            engine_choice['values']=result['engines']
+            if engine.get() not in result['engines']:engine.set(result['default'])
+        busy(service_client.transcription_engines,loaded,'Consultando motores configurados…')
+
+    if service_mode:
+        for label,callback in [('Consultar motores',refresh_engines),('Reintentar original',retry_audio)]:
+            button=ttk.Button(engine_bar,text=label,command=callback);button.pack(side='left',padx=4);controls.append(button)
 
     def generate():
         text = transcript.get("1.0", "end").strip()
