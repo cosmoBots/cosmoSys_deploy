@@ -1,9 +1,9 @@
 name: Optional client unit tests
 on:
   pull_request:
-    paths: ['clients/**', '.github/workflows/optional-clients.yml']
+    paths: ['clients/**', 'services/**', '.github/workflows/optional-clients.yml']
   push:
-    paths: ['clients/**', '.github/workflows/optional-clients.yml']
+    paths: ['clients/**', 'services/**', '.github/workflows/optional-clients.yml']
 permissions:
   contents: read
 jobs:
@@ -18,3 +18,4 @@ jobs:
       - run: python -m unittest discover -s clients/Gestores -v
       - run: python -m unittest discover -s clients/Intercambio-textos -v
       - run: python -m unittest discover -s clients/IA-local -v
+      - run: python -m unittest discover -s services -v
