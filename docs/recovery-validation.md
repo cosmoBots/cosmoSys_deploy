@@ -39,7 +39,8 @@ Restaurar siempre primero a un directorio/VM aislado; revisar rutas absolutas y
 permisos de la configuración antes del arranque. No ejecutar dumps o archivos de
 configuración obtenidos de fuentes no confiables.
 
-La subida a Drive de estos paquetes requiere autorización explícita para sus
-credenciales incluidas. La revisión automática bloqueó el primer intento; no se
-considera guardada remotamente hasta obtener autorización y verificar la subida.
-Las copias anteriores de Drive no sustituyen este conjunto nuevo.
+El 26/10/2026, tras autorización explícita, se subieron los paquetes cifrados a
+Drive privado. Se verificaron nombres, tamaños y estado no compartido. El archivo
+de imágenes se dividió en once partes por el límite de transferencia; se adjuntan
+manifiesto SHA-256 y utilidad de unión. La clave de descifrado quedó separada en
+local. No se ha repetido una descarga y restauración completa desde Drive.

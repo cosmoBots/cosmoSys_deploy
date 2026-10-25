@@ -12,8 +12,9 @@ are configurable, not all tested. No automatic downloads occur.
 
 Responses contain segments with start/end seconds and text, language `es`,
 and review_required=true. Audio is limited to 50 MB, processed serially and
-stored temporarily, then deleted on normal completion/error. Process crashes
-may leave temporary files. There is no duration limit, queue or cancellation;
+archived persistently before inference; only working copies are temporary.
+See `docs/audio-archive.md` for retention, retry and integrity guarantees.
+Process crashes may leave temporary files. There is no duration limit, queue or cancellation;
 compressed long audio can occupy the worker for a long time. The loaded model
 stays resident until the process stops. Health does not load the model.
 
@@ -35,7 +36,7 @@ it does not expose credentials or start an HTTP documentation server.
 ## Local launcher
 
 `python services/start_local.py /private/launcher.json --app actas` starts the
-three authenticated loopback services and opens the configured desktop app.
+four authenticated loopback services and opens the configured desktop app.
 Use `--app dictado` for dictation, or omit it to start services only.
 The private JSON has `environment` (the token/config path variables below),
 `client_python` (Python executable) and `client_directory` (desktop client folder).
