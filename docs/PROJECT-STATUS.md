@@ -1,5 +1,10 @@
 # Estado y especificaciones consolidadas
 
+Actualización de recuperación: véase `recovery-validation.md`. Ya existe copia
+lógica local cifrada y se han arrancado ambos servidores restaurados en aislamiento.
+La subida de este nuevo paquete privado a Drive está pendiente de autorización
+específica tras el bloqueo automático; no confundir con las copias anteriores.
+
 Auditoría del 25/10/2026. Distinguir código, instalación y validación: una función
 presente en Git no necesariamente está activa. Este inventario sustituye las
 descripciones de estado anteriores; sus pruebas históricas conservan su fecha.
