@@ -17,13 +17,13 @@ reintentar por identidad después de reiniciar. Los intentos fallidos no borran 
 original ni los resultados anteriores. Antes de cada intento verifica integridad.
 Un cierre abrupto puede dejar un intento en estado `running`; aún no hay reconciliación.
 
-Esta entrega conecta el archivo al servidor, pero solo registra el adaptador real
-faster-whisper. El cliente de actas permite consultar motores y reintentar el último
-original de la sesión. Quedan pendientes la recuperación de sesiones anteriores,
-un segundo motor real, metadatos de modelo/dispositivo/duración, vínculo con proyectos
-y actas, y detección GPU con alternativa CPU. Las pruebas de intercambio de proveedores
-usan dobles de prueba, no validan dos motores de IA reales. No modifica las correcciones
-editoriales existentes. No sustituye automáticamente un servicio ya ejecutándose.
+El servidor registra faster-whisper y, si está configurado, whisper.cpp. Ambos se
+probaron localmente sobre el mismo original mediante REST. El cliente permite consultar
+motores y reintentar el último original de la sesión. Quedan pendientes el historial
+navegable, metadatos completos persistidos por intento y vínculo con proyectos/actas.
+whisper.cpp dispone de intento GPU y alternativa CPU ante salida con error; véanse
+las limitaciones en `transcription-engines.md`. No sustituye automáticamente servicios
+ya ejecutándose ni correcciones editoriales existentes.
 
 ## API de reintento
 
@@ -42,7 +42,8 @@ El cliente Python expone `transcription_engines`, `retry_transcription` y
 
 Validación: prueba HTTP con fallo de proveedor, recuperación con otro proveedor
 simulado, autenticación, identidad inválida, original inexistente e historial.
-El servidor de producción sigue configurando únicamente faster-whisper.
+La instalación local dispone de ambos adaptadores; esto no acredita su presencia en
+otras instalaciones ni convierte el prototipo en una entrega de producción.
 
 En modo servicios, Actas ofrece «Consultar motores» y «Reintentar original».
 El resultado aparece en una ventana de revisión. Para sustituir una transcripción

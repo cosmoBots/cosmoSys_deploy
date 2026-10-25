@@ -1,6 +1,15 @@
-# Requisitos pendientes de IA local
+# Requisitos de IA local
 
 Registrados el 23 de octubre de 2026. Este documento recoge requisitos; no acredita su implementación.
+
+Estado revisado el 25/10/2026: archivo persistente, reintento REST, selector de dos
+motores reales y perfil ligero whisper.cpp base implementados y probados localmente.
+Se probó CPU y ejecución normal con GPU habilitada; el uso efectivo y la selección
+de GPU dependen del backend. No hay benchmark de calidad ni reparto NVLink.
+Siguen pendientes traducción intercambiable, selector libre de modelos/dispositivos,
+historial navegable, metadatos completos persistidos y backup periódico del audio.
+Los criterios siguientes son el contrato completo, no una lista de todo pendiente.
+Véanse `transcription-engines.md` y `PROJECT-STATUS.md`.
 
 ## Motores intercambiables y equipos modestos
 

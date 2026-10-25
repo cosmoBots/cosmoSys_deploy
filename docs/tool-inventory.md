@@ -1,5 +1,11 @@
 # Optional tools: inventory and release status
 
+Current dated audit: [PROJECT-STATUS.md](PROJECT-STATUS.md). The verification
+section below records historical results, not the current installation state.
+For the service-based audio launcher and CPU/GPU profiles see
+`transcription-engines.md`; the direct-launch instructions below describe the
+original faster-whisper setup. Academic formatting remains experimental.
+
 These are review candidates, not a production release. Install into a disposable
 instance first. No manuscripts, audio, database snapshots, credentials, signing
 keys, downloaded models or third-party binaries are distributed.

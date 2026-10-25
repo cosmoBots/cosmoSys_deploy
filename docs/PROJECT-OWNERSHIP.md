@@ -14,10 +14,10 @@ It is separate from `feature/semantic-exchange-review`, the branch submitted
 in upstream draft PR #13. Pushing this development branch does not update that PR.
 
 Current status: experimental development snapshot, not a production release.
-The extracted minutes domain service and replaceable Ollama adapter are the
-first modularization step. REST service hosting, transcription adapters and
-publication adapters are still being implemented. Existing desktop tools
-remain available and are not switched to this new implementation yet.
+Four local REST processes now cover inference, minutes, reviewed publication and
+transcription. Desktop Actas has a service launcher and replaceable transcription
+engines. This does not imply that every older launcher uses the new configuration.
+See `PROJECT-STATUS.md` for the dated installation audit and remaining gaps.
 
 See `tool-inventory.md` for the previous implementation's validation and gaps.
 New tests: `python -m unittest discover -s services -v`.

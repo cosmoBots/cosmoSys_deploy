@@ -33,4 +33,5 @@ predeterminado del servidor. La selección no modifica transcripciones anteriore
 
 Pendientes: perfiles editables de modelo/dispositivo en la interfaz, recuperación
 de originales de sesiones anteriores, guardar metadatos de ejecución por intento,
-configuración multigpu, traducción intercambiable y exportación APA7.
+configuración multigpu y traducción intercambiable. El formato académico experimental
+se documenta por separado en `academic-export.md`; APA7 completo sigue pendiente.
