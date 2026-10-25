@@ -4,6 +4,19 @@ Auditoría del 25/10/2026. Distinguir código, instalación y validación: una f
 presente en Git no necesariamente está activa. Este inventario sustituye las
 descripciones de estado anteriores; sus pruebas históricas conservan su fecha.
 
+Actualización posterior del mismo día: cerrado el desajuste de clientes. Se copió
+app.py y rest_adapter.py al intercambio instalado, con backup previo, y se añadió
+el lanzador documentado en `client-launcher.md`. Los tres accesos directos cargan
+ahora explícitamente la configuración privada existente. Historias fue iniciado.
+Autenticación REST contra cosmoSys y CGRol correcta; las dos obras narrativas y la
+obra académica pasaron exportación HTTP, lectura del Word y vista previa de
+reimportación sin cambios. No se aplicaron modificaciones a sus textos.
+Pasaron 9 pruebas de intercambio y 4 de gestores, incluidas edición, conflicto e
+idempotencia de instancia de prueba. Coinciden los hashes de los 16 archivos de
+código de clientes comprobados. No equivale a revisión visual completa ni a
+actualización de los plugins/VM. El inventario inferior conserva el diagnóstico
+inicial para explicar la intervención; punto 1 cerrado para estos clientes.
+
 ## Contrato funcional acordado
 
 1. cosmoSys almacena el universo: conceptos, personajes, lugares, hipótesis,
