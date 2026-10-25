@@ -92,7 +92,7 @@ def plain_text(manifest):
 
 
 def branch(manifest, root_key):
-    records = {r['key']: r for r in manifest['records'] if r['key'].startswith('issue:')}
+    records = {r['key']: r for r in manifest['records'] if r['key'].startswith(('issue:','section:'))}
     if root_key not in records:
         raise ValueError('Selecciona una ficha del árbol para exportar su rama.')
     children = {}

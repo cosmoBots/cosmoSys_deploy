@@ -43,7 +43,7 @@ def handler(application):
                 try:
                     with application.lock:
                         w,s,b=application.snapshot(args['work'][0])
-                        if args.get('node'):b=bridge.branch(s,args['node'][0]) if args['node'][0] in {r['key'] for r in b['records']} else None
+                        if args.get('node'):b=bridge.branch(b,args['node'][0]) if args['node'][0] in {r['key'] for r in b['records']} else None
                         if not b:raise ValueError('Rama no válida.')
                         with tempfile.TemporaryDirectory() as td:
                             f=Path(td)/'documento.docx';bridge.write_docx(b,f)
