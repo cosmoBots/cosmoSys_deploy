@@ -270,6 +270,9 @@ done
 
 printf 'Instance %s, %s variant, %s database.\n' \
   "$(deployment_setting COMPOSE_PROJECT_NAME cosmosys)" "$variant" "$database_mode"
+# The overlays of the host take part in every recreation, including the way
+# back, so the report names them.
+deployment_overlays | sed '1s/^/Overlays: /; 2,$s/^/          /'
 printf 'Running:  %s\n' "$running_image"
 printf '          cosmoSys %s' "$running_cosmosys"
 if [ "$variant" = requirements ]; then

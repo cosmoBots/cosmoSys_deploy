@@ -3,8 +3,9 @@ set -eu
 
 # Checks the deployment without starting anything: the catalog of optional
 # plugins, that every revision is declared consistently, that the image names
-# match the content they describe, and that Compose accepts every combination
-# of variant, database mode, proxy and plugin sets through the wrapper.
+# match the content they describe, that Compose accepts every combination
+# of variant, database mode, proxy and plugin sets through the wrapper, and
+# that the wrapper adds the overlays of an instance after them.
 
 root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$root_dir/scripts/deployment-lib.sh"
@@ -126,7 +127,9 @@ if [ -n "$untracked" ]; then
   printf '  %s\n' $untracked >&2
 fi
 
-# Every combination, through the wrapper the scripts use.
+# Every combination, through the wrapper the scripts use. The overlays of a
+# host are not part of this repository, so none is taken from the shell.
+unset COSMOSYS_COMPOSE_OVERLAYS
 check_directory=$(mktemp -d)
 trap 'rm -rf "$check_directory"' EXIT
 all_options=$(catalog_value "$catalog" COSMOSYS_OPTIONS | tr ' ' ',')
@@ -160,6 +163,47 @@ EOF
     done
   done
 done
+
+# The overlays of an instance: found next to its environment file or by
+# absolute path, added after every file of this repository and in the order
+# listed, and refused when one is missing.
+mkdir "$check_directory/overlays"
+cat >"$check_directory/overlays/first.yml" <<'EOF'
+services:
+  redmine:
+    labels:
+      caddy.tls: overlay-check
+      eu.cosmobots.check.first: kept
+      eu.cosmobots.check.order: first
+EOF
+cat >"$check_directory/second.yml" <<'EOF'
+services:
+  redmine:
+    labels:
+      eu.cosmobots.check.order: second
+EOF
+{
+  cat "$check_directory/base-local-shared-none.env"
+  echo "COSMOSYS_COMPOSE_OVERLAYS=overlays/first.yml, $check_directory/second.yml"
+} >"$check_directory/overlays.env"
+if ! overlays_config=$(COSMOSYS_ENV_FILE="$check_directory/overlays.env" deployment_compose config); then
+  error "Compose rejects an instance with overlays"
+else
+  for overlays_label in 'caddy.tls: overlay-check' 'eu.cosmobots.check.first: kept' \
+    'eu.cosmobots.check.order: second'; do
+    case "$overlays_config" in
+      *"$overlays_label"*) ;;
+      *) error "The overlays of an instance do not apply in order: '$overlays_label' is missing" ;;
+    esac
+  done
+fi
+echo "COSMOSYS_COMPOSE_OVERLAYS=overlays/missing.yml" >"$check_directory/missing-overlay.env"
+overlays_status=0
+COSMOSYS_ENV_FILE="$check_directory/missing-overlay.env" deployment_compose config --quiet \
+  >/dev/null 2>&1 || overlays_status=$?
+if [ "$overlays_status" -ne 2 ]; then
+  error "An instance naming a missing overlay returned $overlays_status instead of 2"
+fi
 
 COSMOSYS_DB_ADMIN_PASSWORD=${COSMOSYS_DB_ADMIN_PASSWORD:-configuration-check} \
   docker compose -f shared-db/compose.yml config --quiet

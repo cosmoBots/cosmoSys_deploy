@@ -10,7 +10,8 @@ unset POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD REDMINE_SECRET_KEY_BASE \
   COSMOSYS_DB_ADMIN_USER COSMOSYS_DB_CONNECTION_LIMIT COSMOSYS_COMPOSE_PROJECT \
   COSMOSYS_VARIANT COSMOSYS_ENV_FILE COMPOSE_PROJECT_NAME \
   COSMOSYS_PROXY_MODE COSMOSYS_HOSTNAME COSMOSYS_PROXY_TLS COSMOSYS_PROXY_NETWORK \
-  COSMOSYS_PROXY_BIND_ADDRESS COSMOSYS_PROXY_HTTP_PORT COSMOSYS_PROXY_HTTPS_PORT
+  COSMOSYS_PROXY_BIND_ADDRESS COSMOSYS_PROXY_HTTP_PORT COSMOSYS_PROXY_HTTPS_PORT \
+  COSMOSYS_COMPOSE_OVERLAYS
 
 suffix=$$
 validation_directory=$(mktemp -d)
@@ -91,6 +92,7 @@ wait_for_route() {
     case "$1" in
       present) [ "$route_status" = 200 ] && return 0 ;;
       absent) [ "$route_status" != 200 ] && return 0 ;;
+      blocked) [ "$route_status" = 403 ] && return 0 ;;
     esac
     route_attempt=$((route_attempt + 1))
     if [ "$route_attempt" -ge 45 ]; then
@@ -175,6 +177,40 @@ for docker_api_target in docker-api "${proxy_project}-docker-api-1" $docker_api_
     exit 1
   fi
 done
+
+# Overlays of the host that block address ranges at the proxy. Each one names
+# its own matcher and numbers its respond directive, because Compose merges
+# labels by key: with two plain caddy.respond labels only the last one would
+# survive, and the first block would vanish without an error. private_ranges
+# covers this client, which reaches the proxy through Docker; 192.0.2.0/24 is
+# a documentation range that never does.
+write_block_overlay() {
+  cat >"$validation_directory/overlays/$1.yml" <<EOF
+services:
+  redmine:
+    labels:
+      caddy.@validation_$1.remote_ip: $2
+      caddy.respond_$3: "@validation_$1 403"
+EOF
+}
+
+echo "Checking that two overlays of the host block address ranges together..."
+mkdir "$validation_directory/overlays"
+write_block_overlay first private_ranges 1
+write_block_overlay second 192.0.2.0/24 2
+echo "COSMOSYS_COMPOSE_OVERLAYS=overlays/first.yml,overlays/second.yml" >>"$instance_env"
+instance_compose up -d --wait redmine
+wait_for_route blocked
+
+write_block_overlay first 192.0.2.0/24 1
+write_block_overlay second private_ranges 2
+instance_compose up -d --wait redmine
+wait_for_route blocked
+
+sed '/^COSMOSYS_COMPOSE_OVERLAYS=/d' "$instance_env" >"$validation_directory/instance.env.new"
+cat "$validation_directory/instance.env.new" >"$instance_env"
+instance_compose up -d --wait redmine
+wait_for_route present
 
 instance_compose stop redmine >/dev/null
 wait_for_route absent

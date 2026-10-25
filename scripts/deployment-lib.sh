@@ -155,11 +155,43 @@ deployment_container_label() {
   esac
 }
 
+# Prints the Compose files of the host that the instance adds to the ones of
+# this repository (COSMOSYS_COMPOSE_OVERLAYS, separated by commas), one per
+# line and in order. They belong to whoever runs the host, such as a block of
+# address ranges at the reverse proxy, and never to this repository. A relative
+# path is taken from the directory of the instance environment file. A file
+# that does not exist is an error, so that an instance never starts without
+# something its environment file asks for.
+deployment_overlays() {
+  overlays_value=$(deployment_setting COSMOSYS_COMPOSE_OVERLAYS '') || return
+  [ -n "$overlays_value" ] || return 0
+  overlays_env_file=${COSMOSYS_ENV_FILE:-"$deployment_repository_dir/.env"}
+  overlays_directory=$(CDPATH= cd -- "$(dirname -- "$overlays_env_file")" && pwd) || return
+  overlays_list=$(printf '%s\n' "$overlays_value" | tr ',' '\n' |
+    sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+
+  while IFS= read -r overlays_entry; do
+    [ -n "$overlays_entry" ] || continue
+    case "$overlays_entry" in
+      /*) ;;
+      *) overlays_entry="$overlays_directory/$overlays_entry" ;;
+    esac
+    if [ ! -f "$overlays_entry" ]; then
+      echo "COSMOSYS_COMPOSE_OVERLAYS names $overlays_entry, which does not exist" >&2
+      return 2
+    fi
+    printf '%s\n' "$overlays_entry"
+  done <<EOF
+$overlays_list
+EOF
+}
+
 deployment_compose() {
   db_mode=$(deployment_db_mode) || return
   proxy_mode=$(deployment_proxy_mode) || return
   variant=$(deployment_variant) || return
   compose_plugins=$(deployment_plugins) || return
+  compose_instance_overlays=$(deployment_overlays) || return
 
   # Commands that build or start containers need an image with the tools of
   # the plugin sets; reading the state of an instance does not.
@@ -185,6 +217,16 @@ deployment_compose() {
     fi
     set -- --env-file "$COSMOSYS_ENV_FILE" "$@"
   fi
+
+  # The overlays of the instance come last, so that they can change anything
+  # the files of this repository declare, and in the order the instance lists
+  # them. Arguments are prepended, so they are added from the last one.
+  while IFS= read -r compose_overlay; do
+    [ -n "$compose_overlay" ] || continue
+    set -- -f "$compose_overlay" "$@"
+  done <<EOF
+$(printf '%s\n' "$compose_instance_overlays" | sed '1!G;h;$!d')
+EOF
 
   # Only compose.requirements.yml changes the image; the overlays of the
   # plugin sets only add services, so their order does not matter. Arguments
