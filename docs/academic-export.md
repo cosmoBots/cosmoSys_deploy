@@ -7,6 +7,13 @@ doble sin espacio adicional entre párrafos y sangría inicial de 1,27 cm al est
 Normal. Conserva los controles de contenido y manifiesto del intercambio reversible.
 No utiliza IA ni modifica contenido o referencias.
 
+Actualización 26/10/2026: Heading1 centrado/negrita, Heading2 a la izquierda/negrita
+y Heading3 a la izquierda/negrita/cursiva, todos sin sangría inicial. Reaplicar el
+perfil produce los mismos bytes, sin duplicar propiedades. No se reescriben los
+títulos ni se altera su capitalización. Los niveles 4 y 5 integrados en el párrafo
+siguen pendientes, igual que paginación y portada. No se presenta como APA7 completo.
+Referencia: https://apastyle.apa.org/style-grammar-guidelines/paper-format/headings
+
 No es un exportador APA7 completo. Pendientes: portada y sus metadatos, números de
 página, tratamiento de los cinco niveles APA, citas en bloque, tablas, figuras,
 referencias con sangría francesa y comprobación de citas/referencias. Los títulos

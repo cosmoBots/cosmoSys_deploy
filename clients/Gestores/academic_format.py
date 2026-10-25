@@ -6,6 +6,12 @@ W='http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 def tag(name):return '{'+W+'}'+name
 
 
+def set_property(parent, name, attributes):
+    """Replace rather than accumulate OOXML properties on repeated formatting."""
+    for old in parent.findall(tag(name)):parent.remove(old)
+    return E.SubElement(parent,tag(name),{tag(k):v for k,v in attributes.items()})
+
+
 def apply_base_format(path):
     with zipfile.ZipFile(path) as archive:
         parts={name:archive.read(name) for name in archive.namelist()}
@@ -22,8 +28,20 @@ def apply_base_format(path):
         identity=style.get(tag('styleId'))
         props=style.find(tag('pPr'))
         if props is None:props=E.SubElement(style,tag('pPr'))
-        E.SubElement(props,tag('jc'),{tag('val'):'center' if identity in ('Title','Heading1') else 'left'})
-        E.SubElement(props,tag('ind'),{tag('firstLine'):'720' if identity=='Normal' else '0'})
+        set_property(props,'ind',{'firstLine':'720' if identity=='Normal' else '0'})
+        set_property(props,'jc',{'val':'center' if identity in ('Title','Heading1') else 'left'})
+        # pPr schema places outlineLvl after indentation and alignment.
+        for outline in props.findall(tag('outlineLvl')):
+            props.remove(outline);props.append(outline)
+        if identity in ('Heading1','Heading2','Heading3'):
+            run=style.find(tag('rPr'))
+            if run is None:run=E.SubElement(style,tag('rPr'))
+            set_property(run,'b',{'val':'1'})
+            set_property(run,'i',{'val':'1' if identity=='Heading3' else '0'})
+            # rPr schema orders bold/italic before font size.
+            for name in ('sz','szCs'):
+                for size in run.findall(tag(name)):
+                    run.remove(size);run.append(size)
     parts['word/document.xml']=E.tostring(document,encoding='utf-8',xml_declaration=True)
     parts['word/styles.xml']=E.tostring(styles,encoding='utf-8',xml_declaration=True)
     with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as archive:
