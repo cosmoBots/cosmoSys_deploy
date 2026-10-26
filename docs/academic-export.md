@@ -1,5 +1,9 @@
 # Exportación académica: primera entrega experimental
 
+Actualización: este documento describe el perfil anterior `academic-base`.
+El nuevo perfil `apa7-student` y el recorrido completo están documentados en
+[academic-workflow.md](academic-workflow.md).
+
 El gestor académico incorpora una descarga independiente del Word estándar:
 `GET /export?work=<id>&profile=academic-base`. Requiere la sesión habitual y toma
 el trabajo guardado. Aplica márgenes de 2,54 cm, Times New Roman 12, interlineado

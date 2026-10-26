@@ -13,6 +13,7 @@ from cosmosys_client import projects, create_node
 MODES={'historias':('Gestor de historias',3110),'academico':('Gestor académico',3120)}
 
 from store import Store
+import apa7
 
 class Application:
     def __init__(self,mode):
@@ -35,6 +36,33 @@ class Application:
         if w['storage']=='local':return self.store.document_changes(w['id'],changes,dry_run)
         return client.server('cosmoSys',w['project'],'check' if dry_run else 'apply',changes)
     def api(self,path,p):
+        if path=='/api/create-instance':
+            if self.mode!='academico':raise ValueError('Operación exclusiva del gestor académico.')
+            s=client.snapshot(p['project']);source=p.get('source')
+            if source and source not in {r['key'] for r in s['records']}:raise ValueError('Fuente fuera del universo.')
+            title=p.get('title','').strip();token=p.get('token','')
+            if not title or len(title)>255 or not isinstance(token,str) or not 1<=len(token)<=128:raise ValueError('Título o identidad incorrectos.')
+            identity='academic-'+hashlib.sha256(token.encode()).hexdigest()
+            existing=next((w for w in self.store.works() if w['id']==identity),None)
+            if existing:
+                if existing['project']!=p['project'] or existing['title']!=title:raise ValueError('Identidad reutilizada con otro trabajo.')
+                return existing
+            names=[title,'Resumen','Introducción','Método','Resultados','Discusión','Referencias']
+            prefix='section:'+identity+':'
+            records=[dict(key=prefix+str(i),parent=None if i==0 else prefix+'0',fields={'subject':name,'description':''}) for i,name in enumerate(names)]
+            work=self.store.add_document(identity,p['project'],title,records)
+            for i in range(len(records)):
+                self.store.save_notes(identity,prefix+str(i),{'sources':[source] if source else [],'export_role':'abstract' if i==1 else 'references' if i==6 else 'body'},0)
+            return work
+        if path in ('/api/save-publication','/api/export-check'):
+            if self.mode!='academico':raise ValueError('Operación exclusiva del gestor académico.')
+            w,s,b=self.snapshot(p['work'])
+            if path=='/api/save-publication':
+                data=apa7.check_settings(p['data'])
+                return {'revision':self.store.save_notes(w['id'],'__publication__',data,int(p['revision']))}
+            notes=self.store.notes(w['id']);settings=notes.get('__publication__',{}).get('data',{})
+            _,warnings,excluded=apa7.prepare(b,notes,settings)
+            return {'warnings':warnings,'excluded':excluded}
         if path=='/api/init':return dict(title=self.title,mode=self.mode,works=self.store.works(),projects=projects('cosmoSys'))
         if path=='/api/project':return client.snapshot(p['project'])
         if path=='/api/connect':
@@ -60,9 +88,10 @@ class Application:
         if path=='/api/save-notes':
             w,s,b=self.snapshot(p['work'])
             if p['node'] not in {r['key'] for r in b['records']}:raise ValueError('Apartado fuera del trabajo.')
-            data=p['data'];allowed={'type','viewpoint','chronology','objective','status','evidence','authors','year','publication','doi','reference','citation','sources'}
+            data=p['data'];allowed={'type','viewpoint','chronology','objective','status','evidence','authors','year','publication','doi','reference','citation','sources','export_role'}
             if not isinstance(data,dict) or set(data)-allowed:raise ValueError('Notas incorrectas.')
             if any(not isinstance(v,str) or len(v)>50000 for k,v in data.items() if k!='sources'):raise ValueError('Notas demasiado extensas.')
+            if data.get('export_role','body') not in apa7.ROLES:raise ValueError('Tipo de exportación incorrecto.')
             refs=data.get('sources',[])
             if not isinstance(refs,list) or len(refs)>100 or not set(refs)<={r['key'] for r in s['records']}:raise ValueError('Referencia no accesible.')
             return dict(revision=self.store.save_notes(w['id'],p['node'],data,int(p['revision'])))
@@ -71,7 +100,7 @@ class Application:
             raw=base64.b64decode(p['file'],validate=True)
             if len(raw)>15_000_000:raise ValueError('El Word supera los 15 MB.')
             with tempfile.TemporaryDirectory() as td:
-                f=Path(td)/'revision.docx';f.write_bytes(raw);m,v=bridge.read_docx(f);changes=bridge.plan(m,v)
+                f=Path(td)/'revision.docx';f.write_bytes(raw);m,v=apa7.read(f);changes=bridge.plan(m,v)
             if m.get('service')!='cosmoSys' or m['project']['identifier']!=w['project']:raise ValueError('El Word pertenece a otro proyecto o servicio.')
             if w['storage']=='local' and (m.get('storage')!='academic-local' or m.get('document_id')!=w['id']):raise ValueError('El Word pertenece a otra instancia documental.')
             if w['storage']!='local' and m.get('storage')=='academic-local':raise ValueError('El Word es de una instancia local, no del universo.')

@@ -48,10 +48,14 @@ def handler(application):
                         with tempfile.TemporaryDirectory() as td:
                             f=Path(td)/'documento.docx';bridge.write_docx(b,f)
                             profile=args.get('profile',['standard'])[0]
-                            if profile not in ('standard','academic-base'):raise ValueError('Perfil desconocido.')
+                            if profile not in ('standard','academic-base','apa7-student'):raise ValueError('Perfil desconocido.')
                             if profile=='academic-base':
                                 if application.mode!='academico':raise ValueError('Perfil exclusivo del gestor académico.')
                                 apply_base_format(f)
+                            if profile=='apa7-student':
+                                if application.mode!='academico':raise ValueError('Perfil exclusivo del gestor académico.')
+                                notes=application.store.notes(w['id'])
+                                apa7.write(b,notes,notes.get('__publication__',{}).get('data',{}),f)
                             raw=f.read_bytes()
                     self.send(200,raw,'application/vnd.openxmlformats-officedocument.wordprocessingml.document',{'Content-Disposition':'attachment; filename="documento.docx"'})
                 except Exception as e:self.send(400,{'error':str(e)})
