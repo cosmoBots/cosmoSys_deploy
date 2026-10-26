@@ -1,5 +1,9 @@
 # Revisión de extensiones de cosmoSys
 
+Propuesta posterior basada en revisión del código del 26/10/2026:
+[Arquitectura modular: límites, dependencias y migración](ARQUITECTURA-MODULAR-PROPUESTA.md).
+Es una propuesta pendiente de acuerdo, no un cambio de arquitectura ya desplegado.
+
 Código fijo: etiqueta `v0.1.0-preview.1` del fork fpgulias/cosmoSys_deploy.
 Esta guía delimita la revisión solicitada; no cambia la etiqueta publicada.
 Desarrollo promovido por Fran con asistencia de Codex, no atribuido a Txinto.
