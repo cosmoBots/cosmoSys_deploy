@@ -1,5 +1,10 @@
 # Estado y especificaciones consolidadas
 
+**Estado más reciente:** [auditoría del 26/10/2026](AUDITORIA-2026-10-26.md).
+El inventario histórico inferior contiene pendientes ya resueltos (incluido parte
+de APA7) y no debe leerse como estado actual. Para el recorrido académico véase
+[academic-workflow.md](academic-workflow.md).
+
 Actualización de recuperación: véase `recovery-validation.md`. Ya existe copia
 lógica local cifrada y se han arrancado ambos servidores restaurados en aislamiento.
 El 26/10 se autorizó y verificó la subida cifrada a Drive privado, con imágenes
