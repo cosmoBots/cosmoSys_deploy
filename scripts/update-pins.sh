@@ -379,6 +379,13 @@ set_compose_default "$root_dir/compose.requirements.yml" COSMOSYS_REQ_IMAGE "$(s
     printf '| Services of `%s` | %s | image digests in `.env.example` | n/a |\n' "$option" \
       "$(catalog_value "$environment" "$service_pin" | sed -n 's/^[^:]*:\([^@]*\).*/\1/p')"
   done
+  for group in $(catalog_value "$catalog" COSMOSYS_TOOL_GROUPS); do
+    bundle=$(catalog_value "$catalog" "TOOLS_${group}_BUNDLE")
+    [ -n "$bundle" ] || continue
+    info="$root_dir/docker/tool-bundles/$bundle/BUILDINFO"
+    printf '| Prebuilt tools `%s` | %s | hashes/source in `docker/tool-bundles/%s/` | n/a |\n' \
+      "$group" "$(sed -n 's/^Version: //p' "$info")" "$bundle"
+  done
   for group in $(catalog_python_groups "$catalog" "$(catalog_value "$catalog" COSMOSYS_TOOL_GROUPS)"); do
     printf '| Python tools `%s` | %s | hashes in `docker/python/%s.txt` | n/a |\n' "$group" \
       "$(for package in $(catalog_value "$catalog" "TOOLS_${group}_PYTHON"); do

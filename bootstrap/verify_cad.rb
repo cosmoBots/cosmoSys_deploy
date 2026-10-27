@@ -10,6 +10,20 @@ require 'tmpdir'
 abort('CAD viewer is not loaded') unless defined?(RedmineCadPreview)
 abort('CAD integration is not loaded') unless defined?(CosmosysCadPreview::ReportView)
 abort('ImageMagick is unavailable for CAD figures') unless File.executable?('/usr/bin/magick')
+abort('DWG converter is unavailable') unless RedmineCadPreview::DwgConverter.available?
+
+# A genuine upstream drawing, not the viewer's placeholder DWG fixtures.
+# Fixture is copied unchanged from the corresponding sources shipped alongside
+# it. Do not require an xz executable merely to run this runtime check.
+Dir.mktmpdir('dwg-deploy-check-') do |directory|
+  source = File.binread('/usr/local/share/doc/libredwg/sample_2000.dwg')
+  input = File.join(directory, 'sample.dwg')
+  output = File.join(directory, 'sample.dxf')
+  File.binwrite(input, source)
+  abort('Real DWG conversion failed') unless RedmineCadPreview::DwgConverter.convert(input, output)
+  text = File.binread(output)
+  abort('DWG conversion produced no DXF entities') unless text.include?('ENTITIES') && text.include?('EOF')
+end
 
 assets = {
   'redmine_cad_preview/cad_preview.js' => %w[getRenderContext cad-preview:ready cad-preview:error],
@@ -52,4 +66,4 @@ begin
 ensure
   Attachment.storage_path = previous_storage
 end
-puts 'CAD deployment check: PASS (assets, macro, figure validation, independent views, revision conflict)'
+puts 'CAD deployment check: PASS (real DWG conversion, assets, macro, figure validation, independent views, revision conflict)'

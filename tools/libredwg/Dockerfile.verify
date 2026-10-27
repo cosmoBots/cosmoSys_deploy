@@ -1,0 +1,20 @@
+# syntax=docker/dockerfile:1.7
+# Fast real-base checks of the production installer, without starting Redmine.
+# The full deployment/update matrix is still required before promotion.
+ARG REDMINE_IMAGE=redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1
+FROM ${REDMINE_IMAGE}
+ARG TOOLS=
+COPY plugins.conf scripts/catalog-lib.sh docker/install-tools.sh /opt/cosmosys-deploy/
+RUN --mount=type=bind,source=docker/tool-bundles,target=/opt/cosmosys-tool-bundles,ro \
+    sh /opt/cosmosys-deploy/install-tools.sh "${TOOLS}"
+RUN test ! -e /opt/cosmosys-tool-bundles \
+    && test ! -e /opt/cosmosys-python \
+    && if [ "$TOOLS" = libredwg ]; then \
+      dwg2dxf --version \
+      && dwg2dxf -y -o /tmp/libredwg-test.dxf /usr/local/share/doc/libredwg/sample_2000.dwg \
+      && grep -q ENTITIES /tmp/libredwg-test.dxf \
+      && grep -q EOF /tmp/libredwg-test.dxf \
+      && rm /tmp/libredwg-test.dxf; \
+    else \
+      ! command -v dwg2dxf && test ! -e /usr/local/share/doc/libredwg; \
+    fi

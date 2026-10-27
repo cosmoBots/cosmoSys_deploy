@@ -129,10 +129,14 @@ EOF
       return 1
     fi
   done
-  if [ -z "$tools" ] && compose exec -T redmine test -e /opt/cosmosys-python; then
+  if [ -z "$(catalog_python_groups "$deployment_catalog" "$(catalog_tools "$deployment_catalog" "$tools")")" ] && compose exec -T redmine test -e /opt/cosmosys-python; then
     echo "$description carries /opt/cosmosys-python, which none of its plugin sets needs." >&2
     return 1
   fi
+  case ",$tools," in
+    *,libredwg,*) compose exec -T redmine dwg2dxf --version ;;
+    *) compose exec -T redmine sh -c '! command -v dwg2dxf && test ! -d /usr/local/share/doc/libredwg' ;;
+  esac
   for package in $absent_python_packages; do
     if compose exec -T redmine /opt/cosmosys-python/bin/pip show "$package" >/dev/null 2>&1; then
       echo "$description carries the Python package $package, which none of its plugin sets needs." >&2

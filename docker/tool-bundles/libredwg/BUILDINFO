@@ -1,0 +1,11 @@
+Tool: LibreDWG
+Version: 0.14
+Source: https://ftp.gnu.org/gnu/libredwg/libredwg-0.14.tar.xz
+Source SHA256: 62ebb73b984f865960f20ed26619ea5f8789d5e3fd088fa40a2598384da81275
+Base: redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1
+Builder image: sha256:890ecf338c3f028c21cb332ce1336faadb247aa73a131429475603525548b169
+Architecture: amd64
+cc (Debian 14.2.0-19) 14.2.0
+Configure: --prefix=/usr/local --enable-release --disable-bindings --disable-python --disable-docs --disable-shared --enable-static CFLAGS=-O2,-g0
+Unmodified upstream source; static libredwg, dynamic system libc/libm.
+Separate retained builder; no LibreDWG compilation in production Dockerfile.

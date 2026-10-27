@@ -70,7 +70,10 @@ ARG COSMOSYS_TOOLS=
 
 COPY docker/install-tools.sh /opt/cosmosys-deploy/
 COPY docker/python /opt/cosmosys-deploy/python
-RUN sh /opt/cosmosys-deploy/install-tools.sh "${COSMOSYS_TOOLS}"
+# Build-context bind mount: unselected bundles never enter an image layer.
+# LibreDWG is compiled separately; no DWG toolchain/source build runs here.
+RUN --mount=type=bind,source=docker/tool-bundles,target=/opt/cosmosys-tool-bundles,ro \
+    sh /opt/cosmosys-deploy/install-tools.sh "${COSMOSYS_TOOLS}"
 
 # Where the plugins that use Python tools find them: the LaTeX plugin renders
 # formulas with this interpreter, and the notebook viewer runs this jupyter and

@@ -56,7 +56,19 @@ for option in $(catalog_value "$catalog" COSMOSYS_OPTIONS); do
 done
 for tool in $known_tools; do
   python_packages=$(catalog_value "$catalog" "TOOLS_${tool}_PYTHON")
-  if [ -z "$(catalog_value "$catalog" "TOOLS_${tool}_APT")$python_packages" ]; then
+  bundle=$(catalog_value "$catalog" "TOOLS_${tool}_BUNDLE")
+  if [ -n "$bundle" ]; then
+    case "$bundle" in
+      *[!a-z0-9_]*) error "plugins.conf: invalid bundle $bundle" ;;
+    esac
+    if [ ! -f "docker/tool-bundles/$bundle/install.sh" ]; then
+      error "plugins.conf: missing installer for bundle $bundle"
+    elif [ ! -f "docker/tool-bundles/$bundle/SHA256SUMS" ] ||
+      ! (cd "docker/tool-bundles/$bundle" && sha256sum -c SHA256SUMS >/dev/null); then
+      error "plugins.conf: missing or corrupt artifacts for bundle $bundle"
+    fi
+  fi
+  if [ -z "$(catalog_value "$catalog" "TOOLS_${tool}_APT")$python_packages$bundle" ]; then
     error "plugins.conf: tool group $tool lists no packages"
   fi
   [ -n "$python_packages" ] || continue

@@ -437,10 +437,11 @@ instance_runner "
 "
 
 # Optional plugin sets change as part of an update, with the same backup and
-# the same way back. The first set of the catalog that needs tools exercises
-# the last build stage too.
+# the same way back. Select a Python set as well as CAD below, so both kinds
+# of tool installation exercise the last build stage.
 tool_set=$(for option in $(catalog_value "$deployment_catalog" COSMOSYS_OPTIONS); do
-  [ -n "$(catalog_value "$deployment_catalog" "OPTION_${option}_TOOLS")" ] && echo "$option"
+  option_tools=$(catalog_option_tools "$deployment_catalog" "$option")
+  [ -n "$(catalog_python_groups "$deployment_catalog" "$option_tools")" ] && echo "$option"
 done | head -n 1)
 tool_groups=$(catalog_option_tools "$deployment_catalog" "$tool_set" | catalog_join ,)
 running_plugin_sets() {
@@ -459,14 +460,16 @@ fi
 
 echo "Activating the CAD pair through the updater..."
 update --pins "$validation_directory/target.env" --plugins cad
-if [ "$(running_plugin_sets)" != cad ] || [ "$(instance_setting COSMOSYS_TOOLS)" != '' ]; then
-  echo "Activating cad did not select exactly its pair without extra tools" >&2
+cad_tools=$(catalog_option_tools "$deployment_catalog" cad | catalog_join ,)
+if [ "$(running_plugin_sets)" != cad ] || [ "$(instance_setting COSMOSYS_TOOLS)" != "$cad_tools" ]; then
+  echo "Activating cad did not select exactly its pair and tools" >&2
   exit 1
 fi
 instance_runner "abort('the CAD pair is incomplete') unless (%w[redmine_cad_preview cosmosys_cad_preview] - Redmine::Plugin.registered_plugins.keys.map(&:to_s)).empty?"
 echo "Deactivating CAD without removing project data..."
 update --pins "$validation_directory/target.env" --plugins ''
 instance_runner "abort('a CAD plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[redmine_cad_preview cosmosys_cad_preview].include?(id) }; abort('the seeded user was lost while switching CAD') unless User.find_by(login: 'update_validation')"
+deployment_compose exec -T redmine sh -c '! command -v dwg2dxf && test ! -d /usr/local/share/doc/libredwg'
 
 echo "Activating the $tool_set plugin set..."
 update --pins "$validation_directory/target.env" --plugins "$tool_set"

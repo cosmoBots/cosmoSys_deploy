@@ -40,4 +40,13 @@ if [ -n "$python_groups" ]; then
   "$python_env/bin/pip" check
 fi
 
+for group in $tools; do
+  bundle=$(catalog_value "$catalog" "TOOLS_${group}_BUNDLE")
+  [ -n "$bundle" ] || continue
+  case "$bundle" in
+    *[!a-z0-9_]*|'' ) echo "Invalid tool bundle: $bundle" >&2; exit 1 ;;
+  esac
+  sh "/opt/cosmosys-tool-bundles/$bundle/install.sh"
+done
+
 printf '%s\n' $tools >"$deploy_dir/tools"

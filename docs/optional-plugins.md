@@ -7,12 +7,14 @@ image and from the image into a running instance, how to add a set, how to move
 its pins, and what the errors mean.
 
 The `cad` set groups the cosmoBots CAD viewer fork and its cosmoSys integration.
-It needs no new tool group or service. Browser assets are committed in their
+It needs the `libredwg` prebuilt tool group, but no service. Browser assets are committed in their
 source repositories; the base Redmine image supplies ImageMagick. Both the
 disposable validator and updater run `bootstrap/verify_cad.rb`, checking
-asset delivery, macro registration, PNG validation and independent named views
-in temporary storage, without writing project data. DWG conversion remains
-optional. Static report figures require an explicitly saved view.
+real DWG conversion, asset delivery, macro registration, PNG validation and
+independent named views in temporary storage, without writing project data.
+The [retained builder](../tools/libredwg/README.md) is separate from the image
+build; only CAD images receive its checked binary, license and corresponding
+sources. Static report figures require an explicitly saved view.
 `validate-update.sh` also activates and deactivates the CAD pair through the
 canonical updater and verifies that existing test data survives both switches.
 
@@ -73,6 +75,13 @@ are:
 | `JUPYTER_BIN` | `redmine_notebook_preview`, which also takes the `python` next to it for the formulas of a notebook | `/opt/cosmosys-python/bin/jupyter` |
 | `NOTEBOOK_CACHE_DIR` | `redmine_notebook_preview` | `/usr/src/redmine/tmp/notebook_cache` |
 
+Prebuilt tools use `TOOLS_<group>_BUNDLE`, naming a directory under
+`docker/tool-bundles/`. The final stage bind-mounts these directories from the
+build context and runs only the selected installers. Unselected binaries and
+sources do not enter any image layer. Each bundle must validate its hashes and
+architecture and ship its license, build provenance and corresponding source
+where required; compilation is a separate maintainer operation.
+
 These are the defaults of the plugin settings. A value saved earlier in the
 plugin settings page wins over them; the updater checks that LaTeX and the
 notebook viewer find their tools and says which value to set when they do not.
@@ -121,8 +130,8 @@ a rollback to the previous image and sets if anything fails
    source and full commit, or as a local directory copied by the Dockerfile to
    `/opt/cosmosys/plugins-available/<id>`.
 2. If the set needs new tools, add a group to `COSMOSYS_TOOL_GROUPS` with its
-   Debian or Python packages, and run `scripts/update-pins.sh --python` to pin
-   the Python ones.
+   Debian or Python packages (or a checked prebuilt bundle), and run
+   `scripts/update-pins.sh --python` to pin the Python ones.
 3. If the set adds services, put only those services in its overlay, and pin
    their images in `.env.example` and in the defaults of the overlay.
 4. Add checks of what the set does to `scripts/validate-deployment.sh` and
