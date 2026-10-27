@@ -184,6 +184,11 @@ EOF
       ;;
   esac
   case ",$plugins," in
+    *,cad,*)
+      runner /opt/cosmosys-deploy/bootstrap/verify_cad.rb
+      ;;
+  esac
+  case ",$plugins," in
     *,tags,*)
       runner "page = Project.find_by!(identifier: 'csys_help').wiki.find_page('Overview', with_redirect: false); page.tag_list = 'deploy-check'; page.save!; abort('the tag was not stored') unless WikiPage.find(page.id).tag_list.include?('deploy-check'); abort('the tagged page is not found by its tag') unless WikiPage.tagged_with('deploy-check').exists?(page.id); abort('no tag in the tags table') unless AdditionalTag.where(name: 'deploy-check').exists?"
       ;;

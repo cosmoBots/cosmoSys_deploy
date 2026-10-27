@@ -457,6 +457,17 @@ if [ "$update_status" -ne 2 ]; then
   exit 1
 fi
 
+echo "Activating the CAD pair through the updater..."
+update --pins "$validation_directory/target.env" --plugins cad
+if [ "$(running_plugin_sets)" != cad ] || [ "$(instance_setting COSMOSYS_TOOLS)" != '' ]; then
+  echo "Activating cad did not select exactly its pair without extra tools" >&2
+  exit 1
+fi
+instance_runner "abort('the CAD pair is incomplete') unless (%w[redmine_cad_preview cosmosys_cad_preview] - Redmine::Plugin.registered_plugins.keys.map(&:to_s)).empty?"
+echo "Deactivating CAD without removing project data..."
+update --pins "$validation_directory/target.env" --plugins ''
+instance_runner "abort('a CAD plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[redmine_cad_preview cosmosys_cad_preview].include?(id) }; abort('the seeded user was lost while switching CAD') unless User.find_by(login: 'update_validation')"
+
 echo "Activating the $tool_set plugin set..."
 update --pins "$validation_directory/target.env" --plugins "$tool_set"
 if [ "$(running_plugin_sets)" != "$tool_set" ] ||

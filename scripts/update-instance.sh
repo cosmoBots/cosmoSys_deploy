@@ -596,6 +596,13 @@ case ",$target_plugins," in
 esac
 
 case ",$target_plugins," in
+  *,cad,*)
+    if ! deployment_compose exec -T redmine bundle exec rails runner /opt/cosmosys-deploy/bootstrap/verify_cad.rb; then
+      update_failed "The updated instance does not provide CAD views and report figures."
+    fi
+    ;;
+esac
+case ",$target_plugins," in
   *,poris,*)
     if ! deployment_compose exec -T redmine bundle exec rails runner \
     "require 'net/http'; kinds = %w[poris_sys poris_param poris_mode poris_value poris_cmd]; abort('the poris project profile is not registered') unless Cosmosys::ProjectProfileRegistry.registered?('poris'); missing = kinds.reject { |kind| Cosmosys::ItemKindRegistry.registered?(kind) }; abort(\"PORIS item kinds are not registered: #{missing.join(', ')}\") unless missing.empty?; abort('the PORIS trackers are missing') unless Tracker.where(csys_key: kinds).count == kinds.size; viewer = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); bundle = viewer.join('prod.js'); abort('the PORIS viewer bundle is missing') unless bundle.file? && bundle.size > 100_000 && viewer.join('style.css').file?; abort('the PORIS viewer bundle needs Node: it refers to process.env') if bundle.read.match?(/process\\.env/); path = ActionController::Base.helpers.asset_path('plugin_assets/cosmosys_poris/poris_viewer/prod.js'); response = Net::HTTP.get_response(URI(\"http://127.0.0.1:3000#{path}\")); abort(\"the PORIS viewer bundle answered #{response.code} at #{path}\") unless response.is_a?(Net::HTTPSuccess)"; then

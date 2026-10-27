@@ -6,6 +6,16 @@ for whoever maintains the deployment: how a set goes from the catalog into the
 image and from the image into a running instance, how to add a set, how to move
 its pins, and what the errors mean.
 
+The `cad` set groups the cosmoBots CAD viewer fork and its cosmoSys integration.
+It needs no new tool group or service. Browser assets are committed in their
+source repositories; the base Redmine image supplies ImageMagick. Both the
+disposable validator and updater run `bootstrap/verify_cad.rb`, checking
+asset delivery, macro registration, PNG validation and independent named views
+in temporary storage, without writing project data. DWG conversion remains
+optional. Static report figures require an explicitly saved view.
+`validate-update.sh` also activates and deactivates the CAD pair through the
+canonical updater and verifies that existing test data survives both switches.
+
 How to choose the sets of an instance is in the README.
 
 ## The path of a plugin
