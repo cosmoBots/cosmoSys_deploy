@@ -315,7 +315,7 @@ does not update the commits pinned here or an already deployed image.
 | [rspreadsheet](https://github.com/cosmoBots/rspreadsheet) | n/a | `c01d413` | after `v0.5.3` |
 | [cosmosys_adr](https://github.com/NesiaTech/cosmosys_adr) (`adr`) | 0.1.0 | `66f8206` | `v0.1.0` |
 | [redmine_cad_preview](https://github.com/cosmoBots/redmine_cad_preview) (`arch`, `cad`, `poris_arch`) | 1.0.1-cosmobots.1 | `39fec08` | `1.0.1-cosmobots.1` |
-| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.5 | `d6f3a7a` | `0.1.5` |
+| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.6 | `7473acd` | `0.1.6` |
 | [cosmosys_arch](https://github.com/cosmoBots/cosmoSys_Arch) (`arch`, `poris_arch`) | 0.1.4 | `168d338` | `0.1.4` |
 | [redmine_kroki](https://github.com/JeffDess/redmine-kroki) (`kroki`) | 0.5.1 | `4d11ab9` | `v0.5.1` |
 | `redmine_kroki_compat` (`kroki`) | n/a | `kroki_compat/` in this repository | n/a |
