@@ -66,6 +66,12 @@ and maintenance assertions. The hanging-child regression also passes inside
 that final production image: the availability deadline terminates and reaps
 the process, rather than merely returning an unavailable result.
 
-The remaining promotion gate is the canonical updater backup/verification on
-our authorized 3004 test instance. Do not treat that pending gate as completed
-evidence. No other persistent instance is updated here.
+The canonical updater successfully applied this candidate to our authorized
+3004 test instance. Its database/files backup `20261105T222419Z` passes all
+three SHA256 checks. The instance is healthy, HTTP returns 200, and its real
+DWG/CAD and Architecture/bridge checks pass. Counts and maximum IDs are unchanged
+for projects, items, attachments, documents, wiki pages and item relations.
+Core 0.2.8, Requirements 0.3.5, Architecture 0.1.4 and CAD integration 0.1.6
+are active; the upstream fork remains 1.0.1-cosmobots.1.
+No other persistent instance is updated here. This is a tested fork candidate,
+not approval or merge by the canonical deploy maintainers.
