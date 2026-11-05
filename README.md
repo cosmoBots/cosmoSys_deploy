@@ -168,6 +168,12 @@ views and their locks. Architecture 0.1.4 confines its minimal viewer layout to
 its own requests, preserving ordinary attachment pages. Dependency minimums
 are unchanged; no schema migration is added by these two fixes.
 
+CAD integration 0.1.5 additionally requires exactly the validated fork
+`1.0.1-cosmobots.1` (`39fec08`). Upstream main currently declares 1.2.0 and
+provides its own macro and database-backed views; it is not a drop-in replacement
+for this integration. Loading unadapted versions fails with a dependency error.
+The upstream pin is unchanged, and adoption of its new APIs is separate work.
+
 [`plugins.conf`](plugins.conf) declares each set, its plugins and their
 pinned revisions, and is the only place where they are declared. A set with
 services adds its overlay; the scripts add it by themselves, so

@@ -12,7 +12,12 @@ does not imply approval or merge into the canonical cosmoBots repository.
   this distribution are experimental integrations, opt-in with known limitations;
   this does not reclassify independent upstream projects.
 - Pin the current documentation-only release commits plus Architecture 0.1.4
-  and CAD integration 0.1.4. No plugin dependency minimum is raised.
+  and CAD integration 0.1.5. No plugin dependency minimum is raised.
+- Restrict CAD integration to exactly the validated upstream fork version
+  `1.0.1-cosmobots.1` (`39fec08`). Main upstream `ca96eaf` declares 1.2.0 with
+  overlapping macro and view storage; adopting it is not part of this delivery.
+  Newer/unvalidated builds fail early with a clear dependency error. This is
+  an intentional upper/exact compatibility constraint, not an increased minimum.
 - Architecture confines its minimal viewer layout to its own requests, rather
   than overriding Redmine's global attachment layout.
 - CAD integration registers attachment-view cleanup after plugins load and
@@ -42,7 +47,8 @@ CAD remains experimental and untrusted DWG parsing is not certified isolated.
 Directed tests passed in an isolated Redmine laboratory: converter-policy unit
 tests, attachment text/code/image HTTP layout, committed cleanup of default and
 named views/locks, settings rendering, CAD item/wiki and ODT/DOCX/PDF reports,
-Architecture preflight/viewer/permissions and PORIS–CAD dispatch. The laboratory
+Architecture preflight/viewer/permissions, PORIS–CAD dispatch and rejection of
+unadapted upstream versions. The laboratory
 lacks LibreDWG, so real DWG conversion must also pass in the pinned image.
 
 Release gates still to record before approval:
