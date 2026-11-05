@@ -222,7 +222,7 @@ start, or `redmine` does not start either.
 trackers of its own, and a PORIS tab with the porisViewer. Its repository
 carries the viewer bundle already built, so the image needs no Node; the
 updater and the validation check that the bundle is served. It needs cosmoSys
-0.2.4 or later in the pinned PORIS 0.2.3 release, which
+0.2.8 or later in the pinned PORIS 0.2.4 release, which
 `scripts/update-pins.sh` checks whenever it moves a pin.
 
 `cosmosys_adr` keeps Architecture Decision Records as items of the `csAdr`
@@ -301,20 +301,20 @@ does not update the commits pinned here or an already deployed image.
 | Component | Version | Commit | Tag |
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | image manifest in `.env.example` | n/a |
-| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.2.8 | `0d2f488` | `0.2.8` |
-| [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.5 | `9de6487` | `0.3.5` |
+| [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.2.8 | `ff01941` | `0.2.8` |
+| [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.5 | `8d8a1d8` | `0.3.5` |
 | [rspreadsheet](https://github.com/cosmoBots/rspreadsheet) | n/a | `c01d413` | after `v0.5.3` |
 | [cosmosys_adr](https://github.com/NesiaTech/cosmosys_adr) (`adr`) | 0.1.0 | `66f8206` | `v0.1.0` |
 | [redmine_cad_preview](https://github.com/cosmoBots/redmine_cad_preview) (`arch`, `cad`, `poris_arch`) | 1.0.1-cosmobots.1 | `39fec08` | `1.0.1-cosmobots.1` |
-| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.3 | `467ba29` | `0.1.3` |
-| [cosmosys_arch](https://github.com/cosmoBots/cosmoSys_Arch) (`arch`, `poris_arch`) | 0.1.3 | `6d20326` | `0.1.3` |
+| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.4 | `c9a0734` | `0.1.4` |
+| [cosmosys_arch](https://github.com/cosmoBots/cosmoSys_Arch) (`arch`, `poris_arch`) | 0.1.4 | `168d338` | `0.1.4` |
 | [redmine_kroki](https://github.com/JeffDess/redmine-kroki) (`kroki`) | 0.5.1 | `4d11ab9` | `v0.5.1` |
 | `redmine_kroki_compat` (`kroki`) | n/a | `kroki_compat/` in this repository | n/a |
-| [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (`kroki`) | 0.1.3 | `7606873` | `0.1.3` |
-| [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (`latex`, `notebooks`) | 0.1.1 | `0f6ec00` | `0.1.1` |
-| [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (`notebooks`) | 0.2.0 | `91aa27e` | `v0.2.0` |
-| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (`poris`, `poris_arch`) | 0.2.4 | `61d68da` | `0.2.4` |
-| [cosmosys_poris_arch](https://github.com/cosmoBots/cosmoSys_poris_arch) (`poris_arch`) | 0.1.0 | `0a3cac6` | `0.1.0` |
+| [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (`kroki`) | 0.1.3 | `81b18b7` | `0.1.3` |
+| [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (`latex`, `notebooks`) | 0.1.1 | `c8ad27f` | `0.1.1` |
+| [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (`notebooks`) | 0.2.0 | `638962b` | `v0.2.0` |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (`poris`, `poris_arch`) | 0.2.4 | `f80e196` | `0.2.4` |
+| [cosmosys_poris_arch](https://github.com/cosmoBots/cosmoSys_poris_arch) (`poris_arch`) | 0.1.0 | `59442c0` | `0.1.0` |
 | [additionals](https://github.com/AlphaNodes/additionals) (`tags`) | 4.6.0 | `5f5ff95` | `4.6.0` |
 | [additional_tags](https://github.com/AlphaNodes/additional_tags) (`tags`) | 4.6.0 | `3d503b1` | `4.6.0` |
 | Services of `kroki` | 0.32.1 | image digests in `.env.example` | n/a |
