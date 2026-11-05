@@ -11,6 +11,10 @@ abort('CAD viewer is not loaded') unless defined?(RedmineCadPreview)
 abort('CAD integration is not loaded') unless defined?(CosmosysCadPreview::ReportView)
 abort('ImageMagick is unavailable for CAD figures') unless File.executable?('/usr/bin/magick')
 abort('DWG converter is unavailable') unless RedmineCadPreview::DwgConverter.available?
+abort('CAD attachment cleanup is not installed') unless Attachment < CosmosysCadPreview::AttachmentPatch
+abort('CAD attachment cleanup callback is missing') unless Attachment._commit_callbacks.any? { |entry| entry.filter == :cosmosys_cad_remove_report_view }
+abort('DWG converter is not server-managed') unless RedmineCadPreview::DwgConverter.command == '/usr/local/bin/dwg2dxf'
+abort('DWG command field remains configurable') unless Redmine::Plugin.find(:redmine_cad_preview).settings[:partial] == 'settings/cosmosys_cad_converter'
 
 # A genuine upstream drawing, not the viewer's placeholder DWG fixtures.
 # Fixture is copied unchanged from the corresponding sources shipped alongside

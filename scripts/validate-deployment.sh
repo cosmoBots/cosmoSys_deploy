@@ -46,13 +46,6 @@ validate_case() {
     expected_plugins="cosmosys cosmosys_req"
   fi
   expected_plugins="$expected_plugins $active_plugins"
-  dormant_plugins=
-  for plugin in $(catalog_all_plugins "$deployment_catalog"); do
-    case " $active_plugins " in
-      *" $plugin "*) ;;
-      *) dormant_plugins="$dormant_plugins $plugin" ;;
-    esac
-  done
   absent_packages=
   absent_python_packages=
   for tool in $(catalog_value "$deployment_catalog" COSMOSYS_TOOL_GROUPS); do

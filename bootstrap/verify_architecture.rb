@@ -7,6 +7,7 @@ end
 required = %w[arch_type arch_node_key arch_model_csid arch_cad_data arch_motion arch_axis arch_min arch_max arch_default arch_step]
 abort('Architecture schema is incomplete') unless (required - Issue.column_names).empty?
 directory = Redmine::Plugin.find(:cosmosys_arch).directory
+abort('Architecture globally overrides the attachment layout') if File.exist?(File.join(directory, 'app/views/layouts/_file.html.erb'))
 abort('Architecture globally overrides CAD report tools') if File.exist?(File.join(directory, 'app/views/cosmosys_cad_embeds/_report_tools.html.erb'))
 if Redmine::Plugin.installed?(:cosmosys_poris_arch)
   %w[cosmosys_poris_arch_bindings cosmosys_poris_arch_parameter_links cosmosys_poris_arch_command_policies].each do |table|
