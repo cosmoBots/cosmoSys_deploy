@@ -173,6 +173,9 @@ CAD integration 0.1.5 additionally requires exactly the validated fork
 provides its own macro and database-backed views; it is not a drop-in replacement
 for this integration. Loading unadapted versions fails with a dependency error.
 The upstream pin is unchanged, and adoption of its new APIs is separate work.
+CAD integration 0.1.6 additionally preserves the runner's process-group cleanup
+when its availability deadline expires; a hanging child-process regression
+reproduces the earlier issue and verifies termination and reaping.
 
 [`plugins.conf`](plugins.conf) declares each set, its plugins and their
 pinned revisions, and is the only place where they are declared. A set with

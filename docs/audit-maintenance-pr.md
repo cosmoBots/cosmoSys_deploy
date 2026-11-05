@@ -12,7 +12,7 @@ does not imply approval or merge into the canonical cosmoBots repository.
   this distribution are experimental integrations, opt-in with known limitations;
   this does not reclassify independent upstream projects.
 - Pin the current documentation-only release commits plus Architecture 0.1.4
-  and CAD integration 0.1.5. No plugin dependency minimum is raised.
+  and CAD integration 0.1.6. No plugin dependency minimum is raised.
 - Restrict CAD integration to exactly the validated upstream fork version
   `1.0.1-cosmobots.1` (`39fec08`). Main upstream `ca96eaf` declares 1.2.0 with
   overlapping macro and view storage; adopting it is not part of this delivery.
@@ -26,6 +26,9 @@ does not imply approval or merge into the canonical cosmoBots repository.
   server-installed `/usr/local/bin/dwg2dxf` with code-built arguments. Availability
   has a 5-second bound; conversion timeout is capped at 120 seconds. The upstream
   CAD fork is unchanged. This policy is **not process isolation**.
+- Preserve process-group termination/reaping when the availability timeout
+  expires. A real hanging Ruby child reproduces the 0.1.5 failure and passes
+  with the explicit timeout exception in 0.1.6.
 - Include the Architecture catalog test in `check-config.sh`, complete the set
   table and remove an unused validator variable. Add maintenance assertions to
   production-image checks for CAD and Architecture.
@@ -51,11 +54,18 @@ Architecture preflight/viewer/permissions, PORIS–CAD dispatch and rejection of
 unadapted upstream versions. The laboratory
 lacks LibreDWG, so real DWG conversion must also pass in the pinned image.
 
-Release gates still to record before approval:
+The broad matrix passes all 12 configurations, and the full canonical updater
+battery passes from the SHAs previously deployed on 3004. These runs used
+candidate `7a5130e` with CAD 0.1.5. They are not claimed as runs of CAD 0.1.6:
+the final timeout correction is additionally covered by 6 unit tests / 46
+assertions and the real child-process regression in the isolated laboratory.
 
-- Both deployment variants and all optional-set configurations.
-- Real DWG conversion with the shipped binary and the maintenance assertions.
-- Canonical updater validation and backup/verification on our 3004 test instance.
+Final-release gates still to record before approval:
+
+- Repeat base, base+CAD and Requirements+all sets on the final 0.1.6 pins.
+- Real DWG conversion with the shipped binary, maintenance assertions and the
+  hanging-child timeout regression in the final image.
+- Canonical updater backup/verification on our 3004 test instance.
 
 Do not treat this document's planned gates as completed evidence. No public
 production instance other than the explicitly authorized 3004 is updated here.
