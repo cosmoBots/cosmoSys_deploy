@@ -60,12 +60,12 @@ candidate `7a5130e` with CAD 0.1.5. They are not claimed as runs of CAD 0.1.6:
 the final timeout correction is additionally covered by 6 unit tests / 46
 assertions and the real child-process regression in the isolated laboratory.
 
-Final-release gates still to record before approval:
+Final candidate `766e9f3` (CAD 0.1.6) additionally passes base, base+CAD and
+Requirements+all sets, including real DWG conversion with the shipped binary
+and maintenance assertions. The hanging-child regression also passes inside
+that final production image: the availability deadline terminates and reaps
+the process, rather than merely returning an unavailable result.
 
-- Repeat base, base+CAD and Requirements+all sets on the final 0.1.6 pins.
-- Real DWG conversion with the shipped binary, maintenance assertions and the
-  hanging-child timeout regression in the final image.
-- Canonical updater backup/verification on our 3004 test instance.
-
-Do not treat this document's planned gates as completed evidence. No public
-production instance other than the explicitly authorized 3004 is updated here.
+The remaining promotion gate is the canonical updater backup/verification on
+our authorized 3004 test instance. Do not treat that pending gate as completed
+evidence. No other persistent instance is updated here.
