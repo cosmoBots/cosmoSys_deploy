@@ -159,24 +159,6 @@ Saved editorial views live in `files/cosmosys_cad_report_views`, included in
 file-store backups; they are not yet transferred by project snapshots/copies.
 Activate both CAD plugins through this set rather than independently.
 
-CAD integration 0.1.4 fixes DWG conversion to `/usr/local/bin/dwg2dxf`, including
-availability checks. Web `dwg2dxf_command` values are ignored; the settings page
-explains the server-managed executable. Availability is bounded to 5 seconds
-and conversion timeout to at most 120 seconds. This does not provide process
-isolation: CAD remains experimental. Attachment deletion now removes saved
-views and their locks. Architecture 0.1.4 confines its minimal viewer layout to
-its own requests, preserving ordinary attachment pages. Dependency minimums
-are unchanged; no schema migration is added by these two fixes.
-
-CAD integration 0.1.5 additionally requires exactly the validated fork
-`1.0.1-cosmobots.1` (`39fec08`). Upstream main currently declares 1.2.0 and
-provides its own macro and database-backed views; it is not a drop-in replacement
-for this integration. Loading unadapted versions fails with a dependency error.
-The upstream pin is unchanged, and adoption of its new APIs is separate work.
-CAD integration 0.1.6 additionally preserves the runner's process-group cleanup
-when its availability deadline expires; a hanging child-process regression
-reproduces the earlier issue and verifies termination and reaping.
-
 [`plugins.conf`](plugins.conf) declares each set, its plugins and their
 pinned revisions, and is the only place where they are declared. A set with
 services adds its overlay; the scripts add it by themselves, so
