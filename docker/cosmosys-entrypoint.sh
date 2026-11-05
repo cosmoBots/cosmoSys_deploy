@@ -22,6 +22,7 @@ fail() {
 
 options=$(catalog_options "$catalog" "${COSMOSYS_PLUGINS:-}") ||
   fail "COSMOSYS_PLUGINS=${COSMOSYS_PLUGINS:-} names a set this image does not offer"
+catalog_check_variant "$catalog" "$options" "${COSMOSYS_VARIANT:-base}" || exit 64
 
 installed_tools=$(cat "$deploy_dir/tools" 2>/dev/null || true)
 for tool in $(catalog_option_tools "$catalog" "$options"); do
@@ -36,7 +37,7 @@ done
 # twice, once under each path. A container that restarts keeps its copies.
 active_plugins=$(catalog_option_plugins "$catalog" "$options")
 for plugin in $active_plugins; do
-  copy="$plugins_dir/$plugin"
+  copy="$plugins_dir/$(catalog_plugin_directory "$catalog" "$plugin")"
   if [ -f "$copy/.cosmosys-optional-plugin" ]; then
     continue
   elif [ -e "$copy" ]; then

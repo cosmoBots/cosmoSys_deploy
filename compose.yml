@@ -1,7 +1,7 @@
 name: cosmosys
 
 x-redmine-image: &redmine-image
-  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:d806472-5064be017ee4-redmine-7.0.1}
+  image: ${COSMOSYS_IMAGE:-cosmobots/cosmosys:0d2f488-ee9dd554b93d-redmine-7.0.1}
   # Images are built here, never pulled: nobody controls the cosmobots
   # namespace of Docker Hub on behalf of this deployment.
   pull_policy: never
@@ -10,7 +10,7 @@ x-redmine-image: &redmine-image
     target: cosmosys
     args:
       REDMINE_IMAGE: ${REDMINE_IMAGE:-redmine:7.0.1@sha256:6129b73568e19901222eb3947b87ac18bc63280dc3478492b28f32d989262dc1}
-      COSMOSYS_REVISION: ${COSMOSYS_REVISION:-d8064728cbf7944f132d4ac6e317b8c46ec1505d}
+      COSMOSYS_REVISION: ${COSMOSYS_REVISION:-0d2f488c2c87d022e15ce75112471f27bff868d0}
       RSPREADSHEET_REVISION: ${RSPREADSHEET_REVISION:-c01d413abc728db9d62aa1bebe776f548ee69999}
       COSMOSYS_VARIANT: base
       COSMOSYS_TOOLS: ${COSMOSYS_TOOLS:-}
@@ -56,7 +56,7 @@ services:
     environment: *redmine-environment
     volumes:
       - files:/usr/src/redmine/files
-    command: ["sh", "-c", "bundle exec rake db:migrate && bundle exec rake redmine:load_default_data && bundle exec rake redmine:plugins:migrate"]
+    command: ["sh", "-c", "bundle exec rake db:migrate && bundle exec rake redmine:load_default_data && bundle exec rails runner /opt/cosmosys-deploy/bootstrap/migrate_plugins.rb"]
 
   bootstrap:
     <<: *redmine-image

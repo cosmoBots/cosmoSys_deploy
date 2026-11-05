@@ -36,6 +36,10 @@ for option in $(catalog_value "$catalog" COSMOSYS_OPTIONS); do
   if [ -z "$(catalog_value "$catalog" "OPTION_${option}_PLUGINS")" ]; then
     error "plugins.conf: option $option lists no plugins"
   fi
+  case "$(catalog_value "$catalog" "OPTION_${option}_VARIANT")" in
+    ''|base|requirements) ;;
+    *) error "plugins.conf: invalid required variant for $option" ;;
+  esac
   for tool in $(catalog_value "$catalog" "OPTION_${option}_TOOLS"); do
     case "$known_tools" in
       *" $tool "*) ;;
@@ -85,6 +89,9 @@ for tool in $known_tools; do
   done
 done
 for plugin in $(catalog_all_plugins "$catalog"); do
+  case "$(catalog_plugin_directory "$catalog" "$plugin")" in
+    ''|*[!a-z0-9_]*) error "plugins.conf: unsafe runtime directory for $plugin" ;;
+  esac
   local_dir=$(catalog_value "$catalog" "PLUGIN_${plugin}_LOCAL")
   if [ -n "$local_dir" ]; then
     if [ ! -f "$local_dir/init.rb" ]; then
@@ -148,9 +155,16 @@ all_options=$(catalog_value "$catalog" COSMOSYS_OPTIONS | tr ' ' ',')
 all_tools=$(catalog_option_tools "$catalog" "$(catalog_value "$catalog" COSMOSYS_OPTIONS)" | catalog_join ,)
 combinations=0
 for variant in base requirements; do
+  variant_options=
+  for option in $(catalog_value "$catalog" COSMOSYS_OPTIONS); do
+    required_variant=$(catalog_value "$catalog" "OPTION_${option}_VARIANT")
+    if [ -z "$required_variant" ] || [ "$required_variant" = "$variant" ]; then
+      variant_options="${variant_options:+$variant_options,}$option"
+    fi
+  done
   for db_mode in local shared; do
     for proxy_mode in none shared; do
-      for plugins in '' "$all_options"; do
+      for plugins in '' "$variant_options"; do
         tools=
         if [ -n "$plugins" ]; then
           tools=$all_tools

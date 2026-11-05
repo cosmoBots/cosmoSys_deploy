@@ -191,6 +191,7 @@ deployment_compose() {
   proxy_mode=$(deployment_proxy_mode) || return
   variant=$(deployment_variant) || return
   compose_plugins=$(deployment_plugins) || return
+  catalog_check_variant "$deployment_catalog" "$compose_plugins" "$variant" || return
   compose_instance_overlays=$(deployment_overlays) || return
 
   # Commands that build or start containers need an image with the tools of

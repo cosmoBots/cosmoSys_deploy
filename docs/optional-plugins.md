@@ -20,6 +20,15 @@ canonical updater and verifies that existing test data survives both switches.
 
 How to choose the sets of an instance is in the README.
 
+`arch` carries `cosmosys_arch` and both CAD plugins. `poris_arch` carries that
+same set plus `cosmosys_poris` and `cosmosys_poris_arch`. Both require the
+`requirements` image variant (Architecture seeds workflows from Requirements)
+and the `libredwg` tools. No separate `cad` or `poris` selection is needed;
+overlapping sets deduplicate plugins. A base image/instance rejects these sets
+before startup. Existing instances never change variant silently.
+The bridge's integration mappings do not yet roundtrip through snapshots/ODS;
+see the plugin README before relying on copied projects.
+
 ## The path of a plugin
 
 ```mermaid
@@ -42,12 +51,18 @@ every key. A set names its plugins, and optionally:
 - the tool groups it needs in the image (`OPTION_<set>_TOOLS`);
 - an overlay with the services it adds (`OPTION_<set>_COMPOSE`);
 - the settings that pin the images of those services (`OPTION_<set>_PINS`).
+- an image variant requirement (`OPTION_<set>_VARIANT`).
 
 A plugin comes from a public repository at a full commit
 (`PLUGIN_<id>_SOURCE` and `PLUGIN_<id>_REVISION`, with `PLUGIN_<id>_SUBDIR`
 when the plugin is a directory of the repository), or from a directory of this
 repository (`PLUGIN_<id>_LOCAL`). Two sets may share a plugin: `latex` and
 `notebooks` both carry `redmine_cbots_latex`.
+`PLUGIN_<id>_DIRECTORY` optionally chooses a different runtime directory without
+changing the registered plugin ID: Architecture uses `cosmosys_zarch`, and the
+bridge `cosmosys_zzporis_arch`, to load after their dependencies. Verification
+uses that mapping too. Migrations explicitly run cosmoSys then Requirements
+before the remaining plugins; plugin-ID order alone is not dependency order.
 
 ### The image
 
@@ -140,7 +155,7 @@ a rollback to the previous image and sets if anything fails
    and absent tools.
 5. Run `scripts/update-pins.sh` to rewrite the image names and the table of the
    README, then `scripts/validate-deployment.sh all`, which validates every set
-   alone on the base variant and all of them together on Requirements, and
+   alone on its required variant (base unless specified) and all together on Requirements, and
    `scripts/validate-update.sh`.
 
 A plugin fits this mechanism when it works from a copy in `plugins/` and its

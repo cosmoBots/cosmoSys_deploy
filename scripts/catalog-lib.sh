@@ -113,6 +113,22 @@ catalog_all_plugins() {
   catalog_option_plugins "$1" "$(catalog_value "$1" COSMOSYS_OPTIONS)"
 }
 
+# A few plugins must sort after their dependencies in Redmine's loader.
+catalog_plugin_directory() {
+  catalog_directory=$(catalog_value "$1" "PLUGIN_${2}_DIRECTORY")
+  printf '%s\n' "${catalog_directory:-$2}"
+}
+
+catalog_check_variant() {
+  for catalog_variant_option in $2; do
+    catalog_variant_required=$(catalog_value "$1" "OPTION_${catalog_variant_option}_VARIANT")
+    if [ -n "$catalog_variant_required" ] && [ "$catalog_variant_required" != "$3" ]; then
+      echo "Plugin set $catalog_variant_option requires COSMOSYS_VARIANT=$catalog_variant_required (selected: $3)." >&2
+      return 2
+    fi
+  done
+}
+
 # Prints the Debian packages of a list of tool groups.
 catalog_tool_packages() {
   catalog_tool_packages_all=

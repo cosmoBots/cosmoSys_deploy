@@ -471,6 +471,22 @@ update --pins "$validation_directory/target.env" --plugins ''
 instance_runner "abort('a CAD plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[redmine_cad_preview cosmosys_cad_preview].include?(id) }; abort('the seeded user was lost while switching CAD') unless User.find_by(login: 'update_validation')"
 deployment_compose exec -T redmine sh -c '! command -v dwg2dxf && test ! -d /usr/local/share/doc/libredwg'
 
+echo "Activating Architecture and the PORIS bridge through the updater..."
+update --pins "$validation_directory/target.env" --plugins poris_arch
+instance_runner "load '/opt/cosmosys-deploy/bootstrap/verify_architecture.rb'; abort('the seeded user was lost while activating Architecture') unless User.find_by(login: 'update_validation')"
+update --check --pins "$validation_directory/target.env"
+update_status=0
+update --pins "$validation_directory/target.env" --plugins '' >/dev/null 2>&1 || update_status=$?
+if [ "$update_status" -ne 3 ] || [ "$(running_plugin_sets)" != poris_arch ]; then
+  echo "Deactivating Architecture without consent returned $update_status instead of 3" >&2
+  exit 1
+fi
+update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal
+instance_runner "abort('an Architecture plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[cosmosys_arch cosmosys_poris_arch].include?(id) }; abort('the seeded user was lost while deactivating Architecture') unless User.find_by(login: 'update_validation')"
+update --pins "$validation_directory/target.env" --plugins poris_arch
+instance_runner "load '/opt/cosmosys-deploy/bootstrap/verify_architecture.rb'"
+update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal
+
 echo "Activating the $tool_set plugin set..."
 update --pins "$validation_directory/target.env" --plugins "$tool_set"
 if [ "$(running_plugin_sets)" != "$tool_set" ] ||
@@ -526,7 +542,8 @@ if [ "$(running_plugin_sets)" != "$migration_set" ]; then
   exit 1
 fi
 migrated_plugins=$(for plugin in $(catalog_option_plugins "$deployment_catalog" "$migration_set"); do
-  deployment_compose exec -T redmine sh -c "ls plugins/$plugin/db/migrate/*.rb" >/dev/null 2>&1 && echo "$plugin"
+  plugin_directory=$(catalog_plugin_directory "$deployment_catalog" "$plugin")
+  deployment_compose exec -T redmine sh -c "ls plugins/$plugin_directory/db/migrate/*.rb" >/dev/null 2>&1 && echo "$plugin"
 done | catalog_join ' ')
 instance_runner "%w[$migrated_plugins].each { |plugin| abort(\"#{plugin} has no migration applied\") unless ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin}'\").to_i.positive? }"
 case "$migration_set" in

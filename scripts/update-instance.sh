@@ -103,6 +103,7 @@ else
 fi
 target_tools=$(catalog_option_tools "$deployment_catalog" "$target_plugins")
 target_plugins=$(printf '%s\n' "$target_plugins" | catalog_join ,)
+catalog_check_variant "$deployment_catalog" "$(printf '%s' "$target_plugins" | tr ',' ' ')" "$variant" || exit 2
 target_tools=$(printf '%s\n' "$target_tools" | catalog_join ,)
 update_mode=$(deployment_setting COSMOSYS_UPDATE_MODE manual)
 
@@ -559,7 +560,7 @@ if [ "$variant" = requirements ]; then
 fi
 expected_plugins="$expected_plugins $(catalog_option_plugins "$deployment_catalog" "$(printf '%s' "$target_plugins" | tr ',' ' ')" | catalog_join ' ')"
 if ! deployment_compose exec -T redmine bundle exec rails runner \
-  "expected = %w[$expected_plugins].select { |plugin| File.read(File.join('plugins', plugin, 'init.rb')).include?('Plugin.register') }; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort(\"registered plugins: #{actual.sort.join(', ')}; expected: #{expected.sort.join(', ')}\") unless actual.sort == expected.sort"; then
+  "ARGV.replace(%w[$variant $(catalog_option_plugins "$deployment_catalog" "$(printf '%s' "$target_plugins" | tr ',' ' ')" | catalog_join ' ')]); load '/opt/cosmosys-deploy/bootstrap/verify_plugins.rb'"; then
   update_failed "The updated instance does not register exactly the expected plugins."
 fi
 case ",$target_plugins," in
@@ -596,17 +597,25 @@ case ",$target_plugins," in
 esac
 
 case ",$target_plugins," in
-  *,cad,*)
+  *,cad,*|*,arch,*|*,poris_arch,*)
     if ! deployment_compose exec -T redmine bundle exec rails runner /opt/cosmosys-deploy/bootstrap/verify_cad.rb; then
       update_failed "The updated instance does not provide CAD views and report figures."
     fi
     ;;
 esac
 case ",$target_plugins," in
-  *,poris,*)
+  *,poris,*|*,poris_arch,*)
     if ! deployment_compose exec -T redmine bundle exec rails runner \
     "require 'net/http'; kinds = %w[poris_sys poris_param poris_mode poris_value poris_cmd]; abort('the poris project profile is not registered') unless Cosmosys::ProjectProfileRegistry.registered?('poris'); missing = kinds.reject { |kind| Cosmosys::ItemKindRegistry.registered?(kind) }; abort(\"PORIS item kinds are not registered: #{missing.join(', ')}\") unless missing.empty?; abort('the PORIS trackers are missing') unless Tracker.where(csys_key: kinds).count == kinds.size; viewer = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); bundle = viewer.join('prod.js'); abort('the PORIS viewer bundle is missing') unless bundle.file? && bundle.size > 100_000 && viewer.join('style.css').file?; abort('the PORIS viewer bundle needs Node: it refers to process.env') if bundle.read.match?(/process\\.env/); path = ActionController::Base.helpers.asset_path('plugin_assets/cosmosys_poris/poris_viewer/prod.js'); response = Net::HTTP.get_response(URI(\"http://127.0.0.1:3000#{path}\")); abort(\"the PORIS viewer bundle answered #{response.code} at #{path}\") unless response.is_a?(Net::HTTPSuccess)"; then
       update_failed "The updated instance does not provide PORIS models and their viewer."
+    fi
+    ;;
+esac
+
+case ",$target_plugins," in
+  *,arch,*|*,poris_arch,*)
+    if ! deployment_compose exec -T redmine bundle exec rails runner /opt/cosmosys-deploy/bootstrap/verify_architecture.rb; then
+      update_failed "The updated instance does not provide Architecture and its optional PORIS bridge."
     fi
     ;;
 esac

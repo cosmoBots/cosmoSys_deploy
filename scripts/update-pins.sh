@@ -180,7 +180,7 @@ record_move() {
   move_new=$4
   [ "$move_old" != "$move_new" ] || return 0
   move_repository=$(repository "$move_url") || return
-  if ! git -C "$move_repository" merge-base --is-ancestor "$move_old" "$move_new" 2>/dev/null; then
+  if [ -n "$move_old" ] && ! git -C "$move_repository" merge-base --is-ancestor "$move_old" "$move_new" 2>/dev/null; then
     if [ "$allow_backwards" = 0 ]; then
       echo "$move_name would move from $(short "$move_old") to $(short "$move_new"), which does not contain it." >&2
       echo "Pass --allow-backwards if that is intended." >&2
@@ -408,6 +408,10 @@ if [ -n "$summary_file" ]; then
       echo '| Component | From | To |'
       echo '| --- | --- | --- |'
       while IFS='|' read -r name url old new; do
+        if [ -z "$old" ]; then
+          printf '| %s | new plugin | `%s` ([source](%s/tree/%s)) |\n' "$name" "$(short "$new")" "${url%.git}" "$new"
+          continue
+        fi
         printf '| %s | `%s` | `%s` ([compare](%s/compare/%s...%s)) |\n' \
           "$name" "$(short "$old")" "$(short "$new")" "${url%.git}" "$(short "$old")" "$(short "$new")"
       done <"$work_dir/changes"
@@ -415,7 +419,7 @@ if [ -n "$summary_file" ]; then
         echo
         echo "<details><summary>$name: commits since the previous pin</summary>"
         echo
-        git -C "$(repository "$url")" log --format='- `%h` %s' "$old..$new" 2>/dev/null || true
+        git -C "$(repository "$url")" log --format='- `%h` %s' "${old:+$old..}$new" 2>/dev/null || true
         echo
         echo '</details>'
       done <"$work_dir/changes"

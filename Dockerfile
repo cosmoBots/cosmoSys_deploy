@@ -66,6 +66,8 @@ LABEL eu.cosmobots.cosmosys-req.revision="${COSMOSYS_REQ_REVISION}"
 # uses. Everything above is shared by every instance of the same variant.
 FROM cosmosys_${COSMOSYS_VARIANT} AS cosmosys
 
+ARG COSMOSYS_VARIANT
+ENV COSMOSYS_VARIANT=${COSMOSYS_VARIANT}
 ARG COSMOSYS_TOOLS=
 
 COPY docker/install-tools.sh /opt/cosmosys-deploy/

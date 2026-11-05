@@ -30,6 +30,7 @@ case_number=0
 validate_case() {
   selected_variant=$1
   plugins=$(catalog_options "$deployment_catalog" "${2:-}") || return 2
+  catalog_check_variant "$deployment_catalog" "$plugins" "$selected_variant" || return 2
   tools=$(catalog_option_tools "$deployment_catalog" "$plugins")
   active_plugins=$(catalog_option_plugins "$deployment_catalog" "$plugins" | catalog_join ' ')
   plugins=$(printf '%s\n' "$plugins" | catalog_join ,)
@@ -103,10 +104,9 @@ EOF
   fi
 
   # Exactly the plugins of the variant and of the active sets are registered.
-  runner "expected = %w[$expected_plugins].select { |plugin| File.read(File.join('plugins', plugin, 'init.rb')).include?('Plugin.register') }; actual = Redmine::Plugin.registered_plugins.keys.map(&:to_s); abort(\"registered plugins: #{actual.sort.join(', ')}; expected: #{expected.sort.join(', ')}\") unless actual.sort == expected.sort"
+  runner "ARGV.replace(%w[$selected_variant $active_plugins]); load '/opt/cosmosys-deploy/bootstrap/verify_plugins.rb'"
 
   # Dormant plugins stay out of plugins/ and their gems stay unloaded.
-  runner "dormant = %w[$dormant_plugins]; present = dormant.select { |plugin| File.exist?(File.join('plugins', plugin)) }; abort(\"dormant plugins in plugins/: #{present.join(', ')}\") unless present.empty?; loaded = \$LOADED_FEATURES.join(\"\\n\"); Bundler.definition.dependencies.each { |dependency| owners = dormant.select { |plugin| dependency.groups.include?(:\"cosmosys_#{plugin}\") }; next if owners.empty? || dependency.groups.include?(:default); abort(\"#{dependency.name} of dormant #{owners.join(', ')} is loaded\") if loaded.include?(\"/gems/#{dependency.name}-\") }"
 
   # The Gemfile is the one the image was built with, whatever is active, so
   # the official entrypoint never installs gems when the container starts.
@@ -120,7 +120,6 @@ EOF
   compose exec -T redmine bundle check >/dev/null
 
   # One asset of every active plugin that has assets is served.
-  runner "require 'net/http'; %w[$active_plugins].each { |plugin| assets = File.join('plugins', plugin, 'assets'); next unless File.directory?(assets); file = Dir.glob(File.join(assets, '*', '**', '*')).sort.find { |path| File.file?(path) && !File.basename(path).start_with?('.') }; next unless file; logical = File.join('plugin_assets', plugin, file.split('/')[4..].join('/')); path = ActionController::Base.helpers.asset_path(logical); response = Net::HTTP.get_response(URI(\"http://127.0.0.1:3000#{path}\")); abort(\"#{plugin}: #{logical} answered #{response.code} at #{path}\") unless response.is_a?(Net::HTTPSuccess) }"
 
   # Tools of the sets that are not active are not in the image at all.
   for package in $absent_packages; do
@@ -178,7 +177,7 @@ EOF
       ;;
   esac
   case ",$plugins," in
-    *,poris,*)
+    *,poris,*|*,poris_arch,*)
       runner "require 'json'; kinds = %w[poris_sys poris_param poris_mode poris_value poris_cmd]; abort('the poris project profile is not registered') unless Cosmosys::ProjectProfileRegistry.registered?('poris'); missing = kinds.reject { |kind| Cosmosys::ItemKindRegistry.registered?(kind) }; abort(\"PORIS item kinds are not registered: #{missing.join(', ')}\") unless missing.empty?; abort('the PORIS trackers are missing') unless Tracker.where(csys_key: kinds).count == kinds.size; viewer = Rails.root.join('plugins/cosmosys_poris/assets/javascripts/poris_viewer'); bundle = viewer.join('prod.js'); abort('the PORIS viewer bundle is missing') unless bundle.file? && bundle.size > 100_000 && viewer.join('style.css').file?; abort('the PORIS viewer bundle needs Node: it refers to process.env') if bundle.read.match?(/process\\.env/); abort('the PORIS viewer bundle does not record its porisViewer revision') unless JSON.parse(viewer.join('build-info.json').read)['revision'].to_s.match?(/\\A[0-9a-f]{40}\\z/)"
       # A private PORIS project with a parameter, a mode enabling a float value
       # and its precedes relation: the viewer page loads the bundle, and its
@@ -188,9 +187,12 @@ EOF
       ;;
   esac
   case ",$plugins," in
-    *,cad,*)
+    *,cad,*|*,arch,*|*,poris_arch,*)
       runner /opt/cosmosys-deploy/bootstrap/verify_cad.rb
       ;;
+  esac
+  case ",$plugins," in
+    *,arch,*|*,poris_arch,*) runner /opt/cosmosys-deploy/bootstrap/verify_architecture.rb ;;
   esac
   case ",$plugins," in
     *,tags,*)
@@ -233,7 +235,8 @@ case "${1:-all}" in
     # Each set once, every set together on each variant, and nothing.
     validate_case base ''
     for option in $(catalog_value "$deployment_catalog" COSMOSYS_OPTIONS); do
-      validate_case base "$option"
+      option_variant=$(catalog_value "$deployment_catalog" "OPTION_${option}_VARIANT")
+      validate_case "${option_variant:-base}" "$option"
     done
     validate_case requirements ''
     validate_case requirements "$(catalog_value "$deployment_catalog" COSMOSYS_OPTIONS | tr ' ' ',')"

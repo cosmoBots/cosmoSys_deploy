@@ -102,6 +102,7 @@ case "$variant" in
     ;;
 esac
 plugins=$(catalog_options "$deployment_catalog" "$plugins_setting") || exit 2
+catalog_check_variant "$deployment_catalog" "$plugins" "$variant" || exit 2
 tools=$(catalog_option_tools "$deployment_catalog" "$plugins")
 plugins=$(printf '%s\n' "$plugins" | catalog_join ,)
 tools=$(printf '%s\n' "$tools" | catalog_join ,)
