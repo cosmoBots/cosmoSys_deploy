@@ -293,7 +293,7 @@ does not update the commits pinned here or an already deployed image.
 | --- | --- | --- | --- |
 | Redmine | 7.0.1 | image manifest in `.env.example` | n/a |
 | [cosmoSys](https://github.com/cosmoBots/cosmoSys) | 0.2.8 | `ff01941` | `0.2.8` |
-| [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.5 | `8d8a1d8` | `0.3.5` |
+| [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.6 | `6743ee1` | `0.3.6` |
 | [rspreadsheet](https://github.com/cosmoBots/rspreadsheet) | n/a | `c01d413` | after `v0.5.3` |
 | [cosmosys_adr](https://github.com/NesiaTech/cosmosys_adr) (`adr`) | 0.1.0 | `66f8206` | `v0.1.0` |
 | [redmine_cad_preview](https://github.com/cosmoBots/redmine_cad_preview) (`arch`, `cad`, `poris_arch`) | 1.0.1-cosmobots.1 | `39fec08` | `1.0.1-cosmobots.1` |
