@@ -75,7 +75,9 @@ EOF
     deployment_compose "$@"
   }
   runner() {
-    compose exec -T redmine bundle exec rails runner "$1"
+    # Fixtures must be writable by the same user as the web application.
+    # Running uploads as root can leave a new year/month directory unwritable.
+    compose exec -T --user redmine redmine bundle exec rails runner "$1"
   }
 
   cleanup_case() {
