@@ -155,8 +155,11 @@ The retained, separate [LibreDWG toolchain](tools/libredwg/README.md) builds
 against Debian 13; no DWG compiler runs in the production Dockerfile. The
 bundle includes its license and complete corresponding source. Currently
 the CAD tool bundle supports amd64 only.
-Saved editorial views live in `files/cosmosys_cad_report_views`, included in
-file-store backups; they are not yet transferred by project snapshots/copies.
+The server-managed converter path is set in `config/configuration.yml`.
+Saved editorial views use the upstream database table and PNG attachments;
+back up both the database and file store. Project snapshots/copies do not yet
+transfer those views. Earlier experimental JSON views are not imported;
+recreate the required views in the viewer.
 Activate both CAD plugins through this set rather than independently.
 
 [`plugins.conf`](plugins.conf) declares each set, its plugins and their
@@ -296,9 +299,9 @@ does not update the commits pinned here or an already deployed image.
 | [cosmoSys Requirements](https://github.com/cosmoBots/cosmoSys_Req) | 0.3.6 | `6743ee1` | `0.3.6` |
 | [rspreadsheet](https://github.com/cosmoBots/rspreadsheet) | n/a | `c01d413` | after `v0.5.3` |
 | [cosmosys_adr](https://github.com/NesiaTech/cosmosys_adr) (`adr`) | 0.1.0 | `66f8206` | `v0.1.0` |
-| [redmine_cad_preview](https://github.com/cosmoBots/redmine_cad_preview) (`arch`, `cad`, `poris_arch`) | 1.0.1-cosmobots.1 | `39fec08` | `1.0.1-cosmobots.1` |
-| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.6 | `7473acd` | `0.1.6` |
-| [cosmosys_arch](https://github.com/cosmoBots/cosmoSys_Arch) (`arch`, `poris_arch`) | 0.1.4 | `168d338` | `0.1.4` |
+| [redmine_cad_preview](https://github.com/cosmoBots/redmine_cad_preview) (`arch`, `cad`, `poris_arch`) | 1.3.0 | `9679499` | none |
+| [cosmosys_cad_preview](https://github.com/cosmoBots/cosmoSys_cad_preview) (`arch`, `cad`, `poris_arch`) | 0.1.7 | `8625e6b` | `0.1.7` |
+| [cosmosys_arch](https://github.com/cosmoBots/cosmoSys_Arch) (`arch`, `poris_arch`) | 0.1.5 | `dfd1f40` | `0.1.5` |
 | [redmine_kroki](https://github.com/JeffDess/redmine-kroki) (`kroki`) | 0.5.1 | `4d11ab9` | `v0.5.1` |
 | `redmine_kroki_compat` (`kroki`) | n/a | `kroki_compat/` in this repository | n/a |
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (`kroki`) | 0.1.3 | `81b18b7` | `0.1.3` |

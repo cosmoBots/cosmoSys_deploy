@@ -7,6 +7,7 @@ ARG COSMOSYS_VARIANT=base
 FROM ${REDMINE_IMAGE} AS cosmosys_base
 
 COPY config/database.yml config/database.yml
+COPY config/configuration.yml config/configuration.yml
 
 RUN apt-get -o Acquire::Retries=5 update \
     && apt-get -o Acquire::Retries=5 install -y --no-install-recommends \

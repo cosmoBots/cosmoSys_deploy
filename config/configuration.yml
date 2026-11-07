@@ -1,0 +1,4 @@
+# Server-managed executable, not a browser-editable plugin setting.
+# Only CAD-enabled instances load the plugin that consumes this key.
+default:
+  dwg2dxf_command: /usr/local/bin/dwg2dxf
