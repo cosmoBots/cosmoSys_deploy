@@ -1,5 +1,12 @@
 # How optional plugins work
 
+> **EXPERIMENTAL — opt-in:** Every optional set in this distribution is an
+> experimental integration, separate from the production cosmoSys and
+> Requirements core. Expect defects, incomplete features, performance limits
+> and breaking changes. Leave optional sets disabled if you require
+> production-level stability and support. This does not reclassify the
+> independent upstream projects bundled by those sets.
+
 Optional plugins are grouped in sets, such as `kroki` or `tags`, that an
 instance turns on in its environment file (`COSMOSYS_PLUGINS`). This document is
 for whoever maintains the deployment: how a set goes from the catalog into the
@@ -12,6 +19,9 @@ source repositories; the base Redmine image supplies ImageMagick. Both the
 disposable validator and updater run `bootstrap/verify_cad.rb`, checking
 real DWG conversion, asset delivery, macro registration, PNG validation and
 independent named views in temporary storage, without writing project data.
+Maintenance checks also verify registration of report-view cleanup and the
+server-managed `/usr/local/bin/dwg2dxf` policy. Stored web command settings have
+no effect while the integration is enabled; this policy is not a sandbox.
 The [retained builder](../tools/libredwg/README.md) is separate from the image
 build; only CAD images receive its checked binary, license and corresponding
 sources. Static report figures require an explicitly saved view.
