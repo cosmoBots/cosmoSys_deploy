@@ -307,8 +307,8 @@ does not update the commits pinned here or an already deployed image.
 | [cosmosys_kroki](https://github.com/cosmoBots/cosmosys_kroki) (`kroki`) | 0.1.3 | `805b76c` | after `0.1.3` |
 | [redmine_cbots_latex](https://github.com/cosmoBots/redmine_cbots_latex) (`latex`, `notebooks`) | 0.1.1 | `7abb302` | after `0.1.1` |
 | [redmine_notebook_preview](https://github.com/cosmoBots/redmine_notebook_preview) (`notebooks`) | 0.2.0 | `2b76634` | after `v0.2.0` |
-| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (`poris`, `poris_arch`) | 0.2.6 | `b833bcd` | `0.2.6` |
-| [cosmosys_poris_arch](https://github.com/cosmoBots/cosmoSys_poris_arch) (`poris_arch`) | 0.1.2 | `53016c4` | `0.1.2` |
+| [cosmosys_poris](https://github.com/cosmoBots/cosmosys_poris) (`poris`, `poris_arch`) | 0.2.6 | `759e8a8` | `0.2.6` |
+| [cosmosys_poris_arch](https://github.com/cosmoBots/cosmoSys_poris_arch) (`poris_arch`) | 0.1.2 | `dd69ee9` | `0.1.2` |
 | [additionals](https://github.com/AlphaNodes/additionals) (`tags`) | 4.6.0 | `5f5ff95` | `4.6.0` |
 | [additional_tags](https://github.com/AlphaNodes/additional_tags) (`tags`) | 4.6.0 | `3d503b1` | `4.6.0` |
 | Services of `kroki` | 0.32.1 | image digests in `.env.example` | n/a |
