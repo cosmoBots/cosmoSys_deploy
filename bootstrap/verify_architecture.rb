@@ -16,5 +16,6 @@ if Redmine::Plugin.installed?(:cosmosys_poris_arch)
   index = ActiveRecord::Base.connection.indexes(:cosmosys_poris_arch_parameter_links).find { |entry| entry.name == 'idx_cpa_link_target' }
   abort('Parameter mapping index is incompatible') unless index&.unique && index.columns == %w[binding_id parameter_id dof_id]
   abort('PORIS runtime adapter is unavailable') unless defined?(CosmosysPoris::RuntimeExecutionAdapters) && defined?(CosmosysPorisArch::Dispatcher)
+  abort('PORIS runtime observation is unavailable') unless defined?(CosmosysPoris::RuntimeStateObservers)
 end
 puts 'Architecture profiles/schema and optional PORIS bridge: PASS'

@@ -137,6 +137,8 @@ It is the `migrate` service of step 9, which runs `db:migrate`,
 `redmine:load_default_data` and the plugin migration runner against the live
 database. The runner migrates cosmoSys and Requirements first, then the other
 registered plugins, so Architecture can safely use the Requirements schema.
+After successful plugin migration it invokes the standard `db:schema:dump`
+task, as `redmine:plugins:migrate` does, to include those changes in the schema.
 Plugin migrations are not reversible in general: the validation of
 the 0.1.0 to 0.1.1 upgrade asserts precisely that columns of the old schema are
 gone afterwards.

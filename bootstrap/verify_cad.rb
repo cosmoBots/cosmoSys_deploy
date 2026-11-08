@@ -13,6 +13,8 @@ abort('Obsolete CAD JSON store is loaded') if defined?(CosmosysCadPreview::Repor
 abort('ImageMagick is unavailable for CAD figures') unless File.executable?('/usr/bin/magick')
 abort('DWG converter is unavailable') unless RedmineCadPreview::DwgConverter.available?
 abort('Upstream CAD view storage is absent') unless defined?(CadPreviewView) && CadPreviewView.table_exists?
+abort('Duplicate integration appearance settings are exposed') if Redmine::Plugin.find(:cosmosys_cad_preview).configurable?
+abort('Integration overrides upstream CAD defaults') unless RedmineCadPreview::ViewerOptions.for(Attachment.new) == RedmineCadPreview::ViewerOptions.defaults
 abort('DWG converter is not server-managed') unless RedmineCadPreview::DwgConverter.command == '/usr/local/bin/dwg2dxf'
 abort('DWG path is not configured on the server') unless Redmine::Configuration['dwg2dxf_command'] == '/usr/local/bin/dwg2dxf'
 CosmosysCadPreview::UpstreamCompatibility.verify!(Redmine::Plugin.find(:redmine_cad_preview).version)
@@ -38,7 +40,7 @@ Dir.mktmpdir('dwg-deploy-check-') do |directory|
 end
 
 assets = {
-  'redmine_cad_preview/cad_preview.js' => %w[getRenderContext cad-preview:ready cad-preview:error],
+  'redmine_cad_preview/cad_preview.js' => %w[getRenderContext cad-preview:ready cad-preview:error setAxesVisible drawAxes cad-preview-world-axes],
   'redmine_cad_preview/cad_preview.css' => %w[cad-preview-figure inline-block],
   'cosmosys_cad_preview/model_controls.js' => %w[cosmosys_cad_node_index]
 }

@@ -100,6 +100,13 @@ EOF
 
   # Exactly the plugins of the variant and of the active sets are registered.
   runner "ARGV.replace(%w[$selected_variant $active_plugins]); load '/opt/cosmosys-deploy/bootstrap/verify_plugins.rb'"
+  if [ "$case_number" -eq 1 ]; then
+    # Use the image's Ruby/Rake; deployment operators need only Docker, not a
+    # Ruby toolchain or test gems on the host. This test does not boot Rails.
+    docker run --rm --network none --entrypoint sh \
+      --mount "type=bind,source=$deployment_repository_dir,target=/deployment,readonly" \
+      "$image" -c 'bundle exec ruby /deployment/scripts/test-plugin-migrations.rb' </dev/null
+  fi
 
   # Dormant plugins stay out of plugins/ and their gems stay unloaded.
 
@@ -141,6 +148,15 @@ EOF
 
   # Every migration of every registered plugin is applied.
   runner "Redmine::Plugin.all.each { |plugin| migrations = Dir.glob(File.join(plugin.directory, 'db', 'migrate', '*.rb')).size; next if migrations.zero?; applied = ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin.id}'\").to_i; abort(\"#{plugin.id}: #{applied} of #{migrations} migrations applied\") unless applied == migrations }"
+
+  # The completed migration container, not the separately created web service,
+  # owns the dump produced after plugin migrations. A core-only dump lacks csid.
+  compose cp migrate:/usr/src/redmine/db/schema.rb "$validation_directory/schema-$case_number.rb"
+  if ! grep -q '"csid"' "$validation_directory/schema-$case_number.rb" ||
+     ! grep -q '"cscode"' "$validation_directory/schema-$case_number.rb"; then
+    echo 'Plugin schema missing from final dump' >&2
+    return 1
+  fi
 
   case ",$plugins," in
     *,adr,*)
