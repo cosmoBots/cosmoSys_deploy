@@ -3,12 +3,9 @@
 Reproducible Docker Compose deployment for production use of cosmoSys and
 cosmoSys Requirements on the supported versions and documented configurations.
 
-> **EXPERIMENTAL optional plugins:** Only `cosmosys` and `cosmosys_req` have
-> production status in this distribution. Every optional plugin set is an
-> experimental, opt-in integration. Expect defects, incomplete features,
-> performance limits and breaking changes; leave these sets disabled if you
-> require production-level stability and support. This classification describes
-> our integrations, not the maturity of independent third-party projects.
+The following optional sets, which this deployment can install and configure,
+are experimental: `arch`, `cad`, `kroki`, `latex`, `notebooks`, `poris` and
+`poris_arch`.
 
 The repository provides two variants from one common definition:
 
