@@ -4,13 +4,27 @@
 require 'base64'
 require 'net/http'
 require 'open3'
-require 'ostruct'
+require 'securerandom'
 require 'tmpdir'
 
 abort('CAD viewer is not loaded') unless defined?(RedmineCadPreview)
-abort('CAD integration is not loaded') unless defined?(CosmosysCadPreview::ReportView)
+abort('CAD integration is not loaded') unless RedmineCadPreview::Macro.singleton_class < CosmosysCadPreview::ReportMacroPatch
+abort('Obsolete CAD JSON store is loaded') if defined?(CosmosysCadPreview::ReportView)
 abort('ImageMagick is unavailable for CAD figures') unless File.executable?('/usr/bin/magick')
 abort('DWG converter is unavailable') unless RedmineCadPreview::DwgConverter.available?
+abort('Upstream CAD view storage is absent') unless defined?(CadPreviewView) && CadPreviewView.table_exists?
+abort('Duplicate integration appearance settings are exposed') if Redmine::Plugin.find(:cosmosys_cad_preview).configurable?
+abort('Integration overrides upstream CAD defaults') unless RedmineCadPreview::ViewerOptions.for(Attachment.new) == RedmineCadPreview::ViewerOptions.defaults
+abort('DWG converter is not server-managed') unless RedmineCadPreview::DwgConverter.command == '/usr/local/bin/dwg2dxf'
+abort('DWG path is not configured on the server') unless Redmine::Configuration['dwg2dxf_command'] == '/usr/local/bin/dwg2dxf'
+CosmosysCadPreview::UpstreamCompatibility.verify!(Redmine::Plugin.find(:redmine_cad_preview).version)
+unsupported_rejected = false
+begin
+  CosmosysCadPreview::UpstreamCompatibility.verify!('1.2.0')
+rescue Redmine::PluginRequirementError
+  unsupported_rejected = true
+end
+abort('Unadapted upstream CAD release was accepted') unless unsupported_rejected
 
 # A genuine upstream drawing, not the viewer's placeholder DWG fixtures.
 # Fixture is copied unchanged from the corresponding sources shipped alongside
@@ -26,9 +40,9 @@ Dir.mktmpdir('dwg-deploy-check-') do |directory|
 end
 
 assets = {
-  'redmine_cad_preview/cad_preview.js' => %w[getRenderContext cad-preview:ready cad-preview:error],
-  'cosmosys_cad_preview/report_view.js' => %w[captureReportImage],
-  'cosmosys_cad_preview/report_capture.js' => %w[alphaBounds captureReportImage]
+  'redmine_cad_preview/cad_preview.js' => %w[getRenderContext cad-preview:ready cad-preview:error setAxesVisible drawAxes cad-preview-world-axes],
+  'redmine_cad_preview/cad_preview.css' => %w[cad-preview-figure inline-block],
+  'cosmosys_cad_preview/model_controls.js' => %w[cosmosys_cad_node_index]
 }
 assets.each do |asset, markers|
   path = ActionController::Base.helpers.asset_path("plugin_assets/#{asset}")
@@ -40,30 +54,42 @@ abort('CAD macro is not registered') unless Redmine::WikiFormatting::Macros.avai
 
 # Real validation/storage, but isolated files and no writes to project data.
 previous_storage = Attachment.storage_path
+previous_user = User.current
 begin
   Dir.mktmpdir('cad-deploy-check-') do |directory|
     Attachment.storage_path = directory
-    attachment = OpenStruct.new(id: 1, digest: 'cad-check', filesize: 1)
-    actor = OpenStruct.new(id: 0)
+    actor = User.active.find_by!(admin: true)
+    User.current = actor
     state = { 'version' => 1, 'projection' => 'drawing', 'center' => [0, 0],
               'view_width' => 100, 'aspect' => 1.5 }
     png, error, result = Open3.capture3('/usr/bin/magick', '-size', '2x1', 'xc:#808080', 'png:-', binmode: true)
     abort("CAD figure generation failed: #{error}") unless result.success?
-    payload = { 'state' => state, 'cad_report_image' => "data:image/png;base64,#{Base64.strict_encode64(png)}", 'revision' => nil }
-    store = CosmosysCadPreview::ReportView
-    first = store.save!(attachment, payload, actor, view: 'front')
-    store.save!(attachment, payload, actor, view: 'detail')
-    abort('CAD named views share revisions') if store.read(attachment, view: 'detail')['revision'] == first['revision']
-    abort('CAD default view was overwritten') if store.read(attachment)
-    abort('CAD figure changed') unless store.read(attachment, view: 'front')['png'] == Base64.strict_encode64(png)
-    begin
-      store.save!(attachment, payload, actor, view: 'front')
-      abort('CAD optimistic locking is not enforced')
-    rescue CosmosysCadPreview::ReportView::Conflict
-      # Expected: an old revision must never overwrite a saved view.
+    Project.transaction do
+      suffix = SecureRandom.hex(6)
+      project = Project.create!(name: 'CAD deployment check', identifier: "cad-check-#{suffix}", cscode: "CAD#{suffix}", is_public: false)
+      attachment = Attachment.create!(container: project, author: actor, file: "solid #{suffix}\nendsolid\n", filename: 'check.stl')
+      store = RedmineCadPreview::Views
+      first = store.save(attachment, 'front', user: actor, state: state, image: png)
+      detail = store.save(attachment, 'detail', user: actor, state: state, image: png)
+      raise 'CAD view save failed' unless first.persisted? && detail.persisted?
+      raise 'CAD default view was overwritten' unless store.default(attachment).id == first.id
+      raise 'CAD figure changed' unless File.binread(store.find(attachment, 'FRONT').image.diskfile) == png
+      raise 'Private CAD figure is public' if first.image.visible?(User.anonymous)
+      conflict = false
+      begin
+        store.save(attachment, 'front', user: actor, revision: first.revision + 1, state: state, image: png)
+      rescue RedmineCadPreview::Views::Conflict
+        conflict = true
+      end
+      raise 'CAD optimistic locking is not enforced' unless conflict
+      raise 'CAD named views are not independent' unless detail.reload.state == state
+      store.delete(attachment, 'front', revision: first.revision)
+      raise 'Deleting one view removed another' unless store.find(attachment, 'detail').id == detail.id
+      raise ActiveRecord::Rollback
     end
   end
 ensure
   Attachment.storage_path = previous_storage
+  User.current = previous_user
 end
 puts 'CAD deployment check: PASS (real DWG conversion, assets, macro, figure validation, independent views, revision conflict)'

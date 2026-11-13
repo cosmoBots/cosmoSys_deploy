@@ -467,8 +467,14 @@ if [ "$(running_plugin_sets)" != cad ] || [ "$(instance_setting COSMOSYS_TOOLS)"
 fi
 instance_runner "abort('the CAD pair is incomplete') unless (%w[redmine_cad_preview cosmosys_cad_preview] - Redmine::Plugin.registered_plugins.keys.map(&:to_s)).empty?"
 echo "Deactivating CAD without removing project data..."
-update --pins "$validation_directory/target.env" --plugins ''
-instance_runner "abort('a CAD plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[redmine_cad_preview cosmosys_cad_preview].include?(id) }; abort('the seeded user was lost while switching CAD') unless User.find_by(login: 'update_validation')"
+update_status=0
+update --pins "$validation_directory/target.env" --plugins '' >/dev/null 2>&1 || update_status=$?
+if [ "$update_status" -ne 3 ] || [ "$(running_plugin_sets)" != cad ]; then
+  echo "Deactivating migrated CAD without consent returned $update_status instead of 3" >&2
+  exit 1
+fi
+update --pins "$validation_directory/target.env" --plugins '' --allow-plugin-removal
+instance_runner "abort('a CAD plugin stayed active') if Redmine::Plugin.registered_plugins.keys.map(&:to_s).any? { |id| %w[redmine_cad_preview cosmosys_cad_preview].include?(id) }; abort('the upstream view table was lost') unless ActiveRecord::Base.connection.table_exists?(:cad_preview_views); abort('the seeded user was lost while switching CAD') unless User.find_by(login: 'update_validation')"
 deployment_compose exec -T redmine sh -c '! command -v dwg2dxf && test ! -d /usr/local/share/doc/libredwg'
 
 echo "Activating Architecture and the PORIS bridge through the updater..."

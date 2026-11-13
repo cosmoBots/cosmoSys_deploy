@@ -46,13 +46,6 @@ validate_case() {
     expected_plugins="cosmosys cosmosys_req"
   fi
   expected_plugins="$expected_plugins $active_plugins"
-  dormant_plugins=
-  for plugin in $(catalog_all_plugins "$deployment_catalog"); do
-    case " $active_plugins " in
-      *" $plugin "*) ;;
-      *) dormant_plugins="$dormant_plugins $plugin" ;;
-    esac
-  done
   absent_packages=
   absent_python_packages=
   for tool in $(catalog_value "$deployment_catalog" COSMOSYS_TOOL_GROUPS); do
@@ -82,7 +75,9 @@ EOF
     deployment_compose "$@"
   }
   runner() {
-    compose exec -T redmine bundle exec rails runner "$1"
+    # Fixtures must be writable by the same user as the web application.
+    # Running uploads as root can leave a new year/month directory unwritable.
+    compose exec -T --user redmine redmine bundle exec rails runner "$1"
   }
 
   cleanup_case() {
@@ -105,6 +100,13 @@ EOF
 
   # Exactly the plugins of the variant and of the active sets are registered.
   runner "ARGV.replace(%w[$selected_variant $active_plugins]); load '/opt/cosmosys-deploy/bootstrap/verify_plugins.rb'"
+  if [ "$case_number" -eq 1 ]; then
+    # Use the image's Ruby/Rake; deployment operators need only Docker, not a
+    # Ruby toolchain or test gems on the host. This test does not boot Rails.
+    docker run --rm --network none --entrypoint sh \
+      --mount "type=bind,source=$deployment_repository_dir,target=/deployment,readonly" \
+      "$image" -c 'bundle exec ruby /deployment/scripts/test-plugin-migrations.rb' </dev/null
+  fi
 
   # Dormant plugins stay out of plugins/ and their gems stay unloaded.
 
@@ -146,6 +148,15 @@ EOF
 
   # Every migration of every registered plugin is applied.
   runner "Redmine::Plugin.all.each { |plugin| migrations = Dir.glob(File.join(plugin.directory, 'db', 'migrate', '*.rb')).size; next if migrations.zero?; applied = ActiveRecord::Base.connection.select_value(\"SELECT COUNT(*) FROM schema_migrations WHERE version LIKE '%-#{plugin.id}'\").to_i; abort(\"#{plugin.id}: #{applied} of #{migrations} migrations applied\") unless applied == migrations }"
+
+  # The completed migration container, not the separately created web service,
+  # owns the dump produced after plugin migrations. A core-only dump lacks csid.
+  compose cp migrate:/usr/src/redmine/db/schema.rb "$validation_directory/schema-$case_number.rb"
+  if ! grep -q '"csid"' "$validation_directory/schema-$case_number.rb" ||
+     ! grep -q '"cscode"' "$validation_directory/schema-$case_number.rb"; then
+    echo 'Plugin schema missing from final dump' >&2
+    return 1
+  fi
 
   case ",$plugins," in
     *,adr,*)

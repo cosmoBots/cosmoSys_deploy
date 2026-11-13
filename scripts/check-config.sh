@@ -11,6 +11,8 @@ root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$root_dir/scripts/deployment-lib.sh"
 cd "$root_dir"
 
+sh "$root_dir/scripts/test-architecture-catalog.sh"
+
 errors=0
 error() {
   echo "$*" >&2
